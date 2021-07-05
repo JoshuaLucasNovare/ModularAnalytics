@@ -1,0 +1,2 @@
+docker build --tag modularanalytics-django .
+docker run --publish 8000:8000 modularanalytics-django
