@@ -13,7 +13,7 @@ This is the **EDA App** created in Streamlit using the **pandas-profiling** libr
 
 # Upload CSV data
 with st.sidebar.header('1. Upload your CSV data'):
-    uploaded_file = st.sidebar.file_uploader("Upload your input CSV file", type=["csv"])
+    uploaded_file = st.sidebar.file_uploader("Upload your input CSV file. Please put the label on the first column followed by the features", type=["csv"])
     
 # Pandas Profiling Report
 if uploaded_file is not None:
