@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 from eda import show_eda
 from machinelearning import show_machinelearning_analysis
+from sentimentalanalysis import show_wordcloud
 
 # configuration
 st.set_option('deprecation.showfileUploaderEncoding', False)
@@ -63,4 +64,10 @@ if DA_select == 'Machine Learning':
         show_machinelearning_analysis(df)
     except Exception as e:
         print(e)
-    
+
+# Sentimental analysis
+if DA_select == 'Sentiment Analysis':
+    try:
+        show_wordcloud(df)
+    except Exception as e:
+        print(e)
