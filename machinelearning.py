@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 model_scores = {}
 accuracy_scores = {}
 def show_machinelearning_analysis(df):
-    try:
+    try:   
         X = df.iloc[:,1:].values
         y = df.iloc[:, 0:1].values
 
@@ -20,42 +20,41 @@ def show_machinelearning_analysis(df):
         X_train = sc.fit_transform(X_train)
         X_test = sc.transform(X_test)
 
-        
         #Testing Multiple Training Model
         def predictor(predictor, params):
             '''This function is made to test multiple training models'''
             global accuracy_scores
-            if predictor == 'lr':
+            if predictor == 'LogisticRegression':
                 #st.title('Training Logistic Regression on Training Set')
                 from sklearn.linear_model import LogisticRegression
                 model = LogisticRegression(**params)
 
-            elif predictor == 'svm':
+            elif predictor == 'SVC':
                 #st.title('Training Support Vector Machine on Training Set')
                 from sklearn.svm import SVC
                 model = SVC(**params)
             
-            elif predictor == 'ksvm':
+            elif predictor == 'K-SVC':
                 #st.title('Training Kernel Support Vector Machine on Training Set')
                 from sklearn.svm import SVC
                 model = SVC(**params)
 
-            elif predictor == 'knn':
+            elif predictor == 'KNN':
                 #st.title('Training K-Nearest Neighbours on Training Set')
                 from sklearn.neighbors import KNeighborsClassifier
                 model = KNeighborsClassifier(**params)
 
-            elif predictor == 'dt':
+            elif predictor == 'Decision Tree':
                 #st.title('Training Decision Tree Model on Training Set')
                 from sklearn.tree import DecisionTreeClassifier
                 model = DecisionTreeClassifier(**params)
 
-            elif predictor == 'nb':
+            elif predictor == 'Gaussian NB':
                 #st.title('Training Naive Bayes Model on Training Set')
                 from sklearn.naive_bayes import GaussianNB
                 model = GaussianNB(**params)
                 
-            elif predictor == 'rfc':
+            elif predictor == 'Random Forest':
                 #st.title('Training Random Forest Model on Training Set')
                 from sklearn.ensemble import RandomForestClassifier
                 model = RandomForestClassifier(**params)
@@ -64,6 +63,7 @@ def show_machinelearning_analysis(df):
                 exit    
 
             model.fit(X_train, y_train)
+            
             #filename = "something_" + predictor + ".pkl"
             #pickle.dump(model, open(filename, 'wb'))
 
@@ -84,37 +84,35 @@ def show_machinelearning_analysis(df):
            # st.subheader('''Evaluating Model Performance''')
             accuracy = accuracy_score(y_test, y_pred)
             #st.write("Accuracy: {:.2f} %".format(accuracy.mean()*100))
-            model_scores[model] = accuracy.mean()*100
+            model_scores[predictor] = accuracy.mean()*100
             #st.subheader('''Applying K-Fold Cross validation''')
             from sklearn.model_selection import cross_val_score
             accuracies = cross_val_score(estimator=model, X=X_train, y=y_train, cv=10)
             #st.write("Accuracy: {:.2f} %".format(accuracies.mean()*100))
-            accuracy_scores[model] = accuracies.mean()*100
+            accuracy_scores[predictor] = accuracies.mean()*100
             #st.write("Standard Deviation: {:.2f} %".format(accuracies.std()*100),'\n') 
         
-        predictor('lr', {'penalty': 'l1', 'solver': 'saga', 'max_iter': 5000})
-        predictor('svm', {'C': 1, 'gamma': 0.8,'kernel': 'linear', 'random_state': 0})
-        predictor('ksvm', {'C': 1, 'gamma': 0.1, 'kernel': 'rbf', 'random_state': 0})
-        predictor('knn', {'n_neighbors': 5, 'n_jobs':1})
-        predictor('dt', {'criterion': 'gini', 'max_features': 'auto', 'splitter': 'random' ,'random_state': 0})
-        predictor('nb', {})
-        predictor('rfc', {'criterion': 'entropy', 'max_features': 'auto', 'n_estimators': 250,'random_state': 0})
+        predictor('LogisticRegression', {'penalty': 'l1', 'solver': 'saga', 'max_iter': 5000})
+        predictor('SVC', {'C': 1, 'gamma': 0.8,'kernel': 'linear', 'random_state': 0})
+        predictor('K-SVC', {'C': 1, 'gamma': 0.1, 'kernel': 'rbf', 'random_state': 0})
+        predictor('KNN', {'n_neighbors': 5, 'n_jobs':1})
+        predictor('Decision Tree', {'criterion': 'gini', 'max_features': 'auto', 'splitter': 'random' ,'random_state': 0})
+        predictor('Gaussian NB', {})
+        predictor('Random Forest', {'criterion': 'entropy', 'max_features': 'auto', 'n_estimators': 250,'random_state': 0})
 
-        fig = plt.figure(figsize=(12, 6))
-        model_accuracies = list(model_scores.values())
-        model_names = ['LogisticRegression', 'SVC',
-                        'K-SVC','KNN','Decisiontree', 'GaussianNB','RandomForest']
-        sns.barplot(x=model_accuracies, y=model_names, palette='mako')
+
+        def createFig(values):
+            modelDf = pd.Series(values, name='Accuracy Score')
+            modelDf.index.name = 'Models'
+            modelDf.reset_index()
+            fig1 = px.bar(modelDf, x=modelDf.index, y=modelDf.name)
+            st.write(fig1)
+        
+        
         st.subheader('Model Performance Comparison')
-        st.write(fig)
-
-        fig = plt.figure(figsize=(12, 6))
-        model_accuracies = list(accuracy_scores.values())
-        model_names = ['LogisticRegression', 'SVC',
-                        'K-SVC','KNN','Decisiontree', 'GaussianNB','RandomForest']
-        sns.barplot(x=model_accuracies, y=model_names, palette='mako')
+        createFig(model_scores)
         st.subheader('K-Fold Cross Validation Comparison')
-        st.write(fig)  
+        createFig(accuracy_scores)
 
     except Exception as e:
         print(e)
