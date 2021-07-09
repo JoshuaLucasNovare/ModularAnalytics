@@ -8,7 +8,9 @@ import matplotlib.pyplot as plt
 from eda import show_eda
 from machinelearning import show_machinelearning_analysis
 from sentimentalanalysis import show_wordcloud
+import design as design
 
+design.showHeader()
 # configuration
 st.set_option('deprecation.showfileUploaderEncoding', False)
 
@@ -46,6 +48,7 @@ except Exception as e:
 
 # add a select widget to the side bar
 #Data Analysis Selection
+st.sidebar.subheader('Data Analysis')
 DA_select = st.sidebar.selectbox(
     label="Select the Data Analysis you want to see",
     options=['Charts/EDA', 'Machine Learning', 'Sentiment Analysis']
@@ -71,3 +74,5 @@ if DA_select == 'Sentiment Analysis':
         show_wordcloud(df)
     except Exception as e:
         print(e)
+
+design.showFooter()
