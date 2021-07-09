@@ -8,7 +8,9 @@ import matplotlib.pyplot as plt
 from eda import show_eda
 from machinelearning import show_machinelearning_analysis
 from sentimentalanalysis import show_wordcloud
+import design as design
 
+design.showHeader()
 # configuration
 st.set_option('deprecation.showfileUploaderEncoding', False)
 
@@ -72,3 +74,5 @@ if DA_select == 'Sentiment Analysis':
         show_wordcloud(df)
     except Exception as e:
         print(e)
+
+design.showFooter()
