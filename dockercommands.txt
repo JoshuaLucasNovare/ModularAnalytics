@@ -1,2 +1,2 @@
-docker build --tag modularanalytics-django .
-docker run --publish 8000:8000 modularanalytics-django
+docker build --tag novare/modularanalytics .
+docker run --publish 8501:8501 novare/modularanalytics
