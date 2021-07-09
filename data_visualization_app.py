@@ -35,16 +35,33 @@ if uploaded_file is not None:
 
 global numeric_columns
 global non_numeric_columns
-try:
-    st.subheader("First 15 Rows")
-    st.write(df.head(15))
-    numeric_columns = list(df.select_dtypes(['float', 'int']).columns)
-    non_numeric_columns = list(df.select_dtypes(['object']).columns)
-    non_numeric_columns.append(None)
-    print(non_numeric_columns)
-except Exception as e:
-    print(e)
-    st.write("Please upload file to the application.")
+
+st.sidebar.subheader('Uploaded Data')
+table_select = st.sidebar.selectbox(
+    label="Show the first 15 rows of the uploaded data?",
+    options=['Show', 'Hide']
+)
+
+if table_select == 'Show':
+    try:
+        st.subheader("First 15 Rows")
+        st.write(df.head(15))
+        numeric_columns = list(df.select_dtypes(['float', 'int']).columns)
+        non_numeric_columns = list(df.select_dtypes(['object']).columns)
+        non_numeric_columns.append(None)
+        print(non_numeric_columns)
+    except Exception as e:
+        print(e)
+        st.write("Please upload file to the application.")
+else:
+    try:
+        numeric_columns = list(df.select_dtypes(['float', 'int']).columns)
+        non_numeric_columns = list(df.select_dtypes(['object']).columns)
+        non_numeric_columns.append(None)
+        print(non_numeric_columns)
+    except Exception as e:
+        print(e)
+        st.write("Please upload file to the application.")
 
 # add a select widget to the side bar
 #Data Analysis Selection
