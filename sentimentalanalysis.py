@@ -1,6 +1,7 @@
 import joblib
 import re
 import logging
+import string
 import streamlit as st
 import plotly_express as px
 import pandas as pd
@@ -8,6 +9,9 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+# from translator import Translator
+from textblob.translate import Translator
+from time import sleep
 from matplotlib.colors import LinearSegmentedColormap
 from wordcloud import WordCloud
 from ast import literal_eval
@@ -64,8 +68,55 @@ def clean_text(text):
 #     text_no_doublespace = re.sub('\s+', ' ', text_nopunct).strip()
     return text_nonum
 
-def show_wordcloud(df):
-    print("Hello, sentimental analysis")
+def remove_punctuations(text):
+    """
+    Removes Punctuations from a string
+    """
+    for punctuation in string.punctuation:
+        text = text.replace(punctuation, '')
+        text = text.lower()
+    return text
+
+def concat_reasons(cols, data):
+    df = data.copy()
+    df = df.dropna(subset=cols, thresh=1)
+    df['concat_reasons'] = df[cols[0]].str.cat(
+        df[cols[1]], sep=". ", na_rep='').str.lstrip('.').str.strip()
+    return df
+
+def translate_to_eng(paragraph):
+    paragraph = str(paragraph).strip().split('.')
+    translated = []
+
+    for sentence in paragraph:
+        try:
+            sleep(1.0)
+            sentence = sentence.strip()
+            en_blob = Translator()
+            translated.append(str(en_blob.translate(sentence, from_lang='tl', to_lang='en')))
+            sleep(1.0)
+        except Exception as e:
+            print(e)
+
+    return translated
+
+def text_translation(df, cols):
+    df = concat_reasons(cols, df)
+    df = df[df['concat_reasons'].apply(remove_punctuations) != 'areas for improvement']
+    df = df[df['concat_reasons'].apply(remove_punctuations) != 'no comment']
+    df = df[df['concat_reasons'].apply(remove_punctuations) != 'compliment']
+    # df.rename({'feedback_mode':'mode', 'office':'office location'}, axis = 1, inplace = True)
+    # df = df[['date_created', 'gender','mode','office location', 'concat_reasons']]
+    df['concat_reasons'] = df['concat_reasons'].replace(r'\s\.', '', regex = True)
+    df['concat_reasons'] = df['concat_reasons'].str.replace('NA.', '')
+
+    final_data = df.copy()
+    final_data['concat_reasons'] = final_data['concat_reasons'].replace(r'\s\.', '', regex = True)
+    final_data['translated'] = final_data['concat_reasons'].apply(translate_to_eng)
+
+    return final_data
+
+def perform_sentimental_analysis(df):
     df['clean_translated'] = df.apply(lambda x: fix_translated(
         x['concat_reasons'], x['translated']), axis=1).str.lower()
     
@@ -89,8 +140,6 @@ def show_wordcloud(df):
     # df.drop('review', axis=1, inplace=True)
 
     # Cleaning the original reviews for wordcloud output
-    test_translated = pd.read_csv('data/translated.csv')
-    print(f"test_translated: {test_translated}")
     stopwords = pd.read_csv('data/stopwords.txt', sep=' ', header=None)
     stopwords.columns = ['words']
     custom = ['sana', 'po', 'yung', 'mas', 'ma', 'kasi', 'ninyo', 'kayo', 'nya', 'pag', 'naman', 'lang', 'no', 'comment']
@@ -100,36 +149,60 @@ def show_wordcloud(df):
     df['word_tokenized'] = df['original'].apply(word_tokenize)
     df['original'] = df['word_tokenized'].apply(lambda x: stop_remover(x, stop_list))
     df['original2'] = df['original'].apply(lambda x: ' '.join(x))
-    df_to_powerbi = df[['year', 'gender', 'mode', 'office location', 'original2', 'sentiment']]
+    df_to_powerbi = df[['original2', 'sentiment']]
     df_to_powerbi.rename({'original2': 'text'}, axis = 1, inplace = True)
     df_to_powerbi = df_to_powerbi[df_to_powerbi['text'] != '']
     st.write(df_to_powerbi.head(15))
-    df_to_powerbi.to_csv('results.csv', index=False)
+    
+    return df_to_powerbi
+
+def process_data(df):
+    st.title("Sentimental Analysis")
 
     try:
         print("Showing wordcloud")
         st.sidebar.subheader("Data Sentimental Analysis")
-        col_select = st.sidebar.selectbox(
-            label="Select Column",
-            options=df_to_powerbi.columns.tolist()
+        comment_columns = st.sidebar.multiselect(
+            label="Comment Columns", 
+            options=df.columns
         )
-        target_col = st.sidebar.selectbox(
-            label="Target Column",
-            options=df_to_powerbi.columns.tolist()
-        )
+        
+        if st.sidebar.button("Process Data"):
+            df_translated = text_translation(df, comment_columns)
+            df_translated = df_translated[['concat_reasons', 'translated']]
+            # st.write(df_translated)
+            show_wordcloud(df_translated)
+        # show_wordcloud(df)
+    except Exception as e:
+        print(e)
+
+def show_wordcloud(df):
+    st.title("Sentimental Analysis")
+    df_to_powerbi = perform_sentimental_analysis(df)
+
+    try:
+        print("Showing wordcloud")
+        # col_select = st.sidebar.selectbox(
+        #     label="Select Column",
+        #     options=df_to_powerbi.columns.tolist()
+        # )
+        # target_col = st.sidebar.selectbox(
+        #     label="Target Column",
+        #     options=df_to_powerbi.columns.tolist()
+        # )
 
         df_cat = {}
         comb = {}
         long_str = {}
         wordcloud = {}
-        categories = list(set(df_to_powerbi[target_col].tolist()))
+        categories = list(set(df_to_powerbi["sentiment"].tolist()))
 
         colors = ["#BF0A30", "#002868"]
         cmap = LinearSegmentedColormap.from_list("mycmap", colors)
 
         for cat in categories:
-            df_cat[cat] = df_to_powerbi[df_to_powerbi[target_col] == cat]
-            comb[cat] = df_cat[cat][col_select].values.tolist()
+            df_cat[cat] = df_to_powerbi[df_to_powerbi["sentiment"] == cat]
+            comb[cat] = df_cat[cat]["text"].values.tolist()
             long_str[cat] = ' '.join(comb[cat])
             wordcloud[cat] = WordCloud(background_color="white", colormap=cmap, width=1000, 
                      height=300, max_font_size=500, relative_scaling=0.3, 
@@ -139,7 +212,7 @@ def show_wordcloud(df):
             st.subheader(f"Category {cat}")
             st.image(image=wordcloud[cat].to_image(), caption=f"Category {cat}")
     except Exception as e:
-        print(e)
+        print(e) # sentiment
 
 
 

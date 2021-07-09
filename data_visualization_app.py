@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 from eda import show_eda
 from machinelearning import show_machinelearning_analysis
-from sentimentalanalysis import show_wordcloud
+from sentimentalanalysis import process_data
 import design as design
 
 design.showHeader()
@@ -88,7 +88,7 @@ if DA_select == 'Machine Learning':
 # Sentimental analysis
 if DA_select == 'Sentiment Analysis':
     try:
-        show_wordcloud(df)
+        process_data(df)
     except Exception as e:
         print(e)
 
