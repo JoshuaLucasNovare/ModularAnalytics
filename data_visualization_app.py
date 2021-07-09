@@ -46,6 +46,7 @@ except Exception as e:
 
 # add a select widget to the side bar
 #Data Analysis Selection
+st.subheader('Data Analysis')
 DA_select = st.sidebar.selectbox(
     label="Select the Data Analysis you want to see",
     options=['Charts/EDA', 'Machine Learning', 'Sentiment Analysis']
