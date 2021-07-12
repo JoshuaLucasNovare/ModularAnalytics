@@ -1,6 +1,9 @@
+import os
+os.environ["SPARK_HOME"] = "/home/jet-novare/Documents/spark-3.1.2-bin-hadoop3.2/"
+os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
+
 import findspark
 findspark.init()
-import os
 import joblib
 import re
 import logging
@@ -25,7 +28,7 @@ from pyspark.sql.functions import udf
 
 
 logging.basicConfig(level=print)
-spark = SparkSession.builder.appName("SentimentalAnalysisTranslator").getOrCreate()
+
 
 def fix_translated(original, translated):
     """
@@ -100,17 +103,19 @@ def translate_to_eng(paragraph):
 
     for sentence in paragraph:
         try:
-            # sleep(1.0)
+            sleep(1.0)
             sentence = sentence.strip()
             en_blob = Translator()
             translated.append(str(en_blob.translate(sentence, from_lang='tl', to_lang='en')))
-            # sleep(1.0)
+            sleep(1.0)
         except Exception as e:
             print(e)
 
     return translated
 
 def text_translation(df, cols):
+    spark = SparkSession.builder.appName("SentimentalAnalysisTranslator").getOrCreate()
+
     df = concat_reasons(cols, df)
     df = df[df['concat_reasons'].apply(remove_punctuations) != 'areas for improvement']
     df = df[df['concat_reasons'].apply(remove_punctuations) != 'no comment']
@@ -125,6 +130,8 @@ def text_translation(df, cols):
 
     udf_translator = udf(translate_to_eng, StringType())
     spark_df = spark.createDataFrame(final_data)
+    # print(f"\n\nSpark DF: {spark_df.show(5)}\n\n")
+    print(f"\n\n\nSpark DF Here\n\n\n")
     spark_translated = spark_df.withColumn("translated", udf_translator('concat_reasons'))
 
     final_data = spark_translated.toPandas()
@@ -167,7 +174,8 @@ def perform_sentimental_analysis(df):
     df_to_powerbi = df[['original2', 'sentiment']]
     df_to_powerbi.rename({'original2': 'text'}, axis = 1, inplace = True)
     df_to_powerbi = df_to_powerbi[df_to_powerbi['text'] != '']
-    st.write(df_to_powerbi.head(15))
+    # st.write(df_to_powerbi.head(15))
+    st.dataframe(df_to_powerbi.head(15))
     
     return df_to_powerbi
 
@@ -192,7 +200,7 @@ def process_data(df):
         print(e)
 
 def show_wordcloud(df):
-    st.title("Sentimental Analysis")
+    # st.title("Sentimental Analysis")
     df_to_powerbi = perform_sentimental_analysis(df)
 
     try:

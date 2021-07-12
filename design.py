@@ -3,7 +3,7 @@ import streamlit as st
 from PIL import Image
 
 def showHeader():
-    bvm = Image.open(r"images\logo.png")
+    bvm = Image.open(r"images/logo.png")
     st.image(bvm)
 
 def showFooter():
