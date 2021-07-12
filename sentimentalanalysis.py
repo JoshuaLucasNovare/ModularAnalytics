@@ -1,3 +1,6 @@
+import findspark
+findspark.init()
+import os
 import joblib
 import re
 import logging
