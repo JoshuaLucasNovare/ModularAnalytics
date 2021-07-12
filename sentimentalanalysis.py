@@ -16,9 +16,13 @@ from matplotlib.colors import LinearSegmentedColormap
 from wordcloud import WordCloud
 from ast import literal_eval
 from nltk.tokenize import word_tokenize
+from pyspark.sql import SparkSession
+from pyspark.sql.types import StringType
+from pyspark.sql.functions import udf
 
 
 logging.basicConfig(level=print)
+spark = SparkSession.builder.appName("SentimentalAnalysisTranslator").getOrCreate()
 
 def fix_translated(original, translated):
     """
@@ -80,9 +84,12 @@ def remove_punctuations(text):
 def concat_reasons(cols, data):
     df = data.copy()
     df = df.dropna(subset=cols, thresh=1)
-    df['concat_reasons'] = df[cols[0]].str.cat(
-        df[cols[1]], sep=". ", na_rep='').str.lstrip('.').str.strip()
-    return df
+    if len(cols) > 1:
+        df['concat_reasons'] = df[cols[0]].str.cat(
+            df[cols[1]], sep=". ", na_rep='').str.lstrip('.').str.strip()
+    else:
+        df['concat_reasons'] = df[cols[0]]
+    return df[['concat_reasons']]
 
 def translate_to_eng(paragraph):
     paragraph = str(paragraph).strip().split('.')
@@ -90,11 +97,11 @@ def translate_to_eng(paragraph):
 
     for sentence in paragraph:
         try:
-            sleep(1.0)
+            # sleep(1.0)
             sentence = sentence.strip()
             en_blob = Translator()
             translated.append(str(en_blob.translate(sentence, from_lang='tl', to_lang='en')))
-            sleep(1.0)
+            # sleep(1.0)
         except Exception as e:
             print(e)
 
@@ -112,7 +119,12 @@ def text_translation(df, cols):
 
     final_data = df.copy()
     final_data['concat_reasons'] = final_data['concat_reasons'].replace(r'\s\.', '', regex = True)
-    final_data['translated'] = final_data['concat_reasons'].apply(translate_to_eng)
+
+    udf_translator = udf(translate_to_eng, StringType())
+    spark_df = spark.createDataFrame(final_data)
+    spark_translated = spark_df.withColumn("translated", udf_translator('concat_reasons'))
+
+    final_data = spark_translated.toPandas()
 
     return final_data
 
