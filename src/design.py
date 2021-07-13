@@ -1,9 +1,10 @@
+import os
 import streamlit.components.v1 as components
 import streamlit as st
 from PIL import Image
 
 def showHeader():
-    bvm = Image.open(r"images/logo.png")
+    bvm = Image.open(f"{os.getcwd()}/src/images/logo.png")
     st.image(bvm)
 
 def showFooter():

@@ -29,7 +29,6 @@ from pyspark.sql.functions import udf
 
 logging.basicConfig(level=print)
 
-
 def fix_translated(original, translated):
     """
     Appends the columns original and translated if the conditions are satisfied.
@@ -39,8 +38,12 @@ def fix_translated(original, translated):
     if translated == '[]':
         f = original
     else:
-        translated = literal_eval(str(translated))
-        f = f.join(translated)
+        try:
+            translated = literal_eval(str(translated))
+        except Exception as e:
+            print(e)
+        finally:
+            f = f.join(translated)
 
     return f
 
@@ -120,8 +123,6 @@ def text_translation(df, cols):
     df = df[df['concat_reasons'].apply(remove_punctuations) != 'areas for improvement']
     df = df[df['concat_reasons'].apply(remove_punctuations) != 'no comment']
     df = df[df['concat_reasons'].apply(remove_punctuations) != 'compliment']
-    # df.rename({'feedback_mode':'mode', 'office':'office location'}, axis = 1, inplace = True)
-    # df = df[['date_created', 'gender','mode','office location', 'concat_reasons']]
     df['concat_reasons'] = df['concat_reasons'].replace(r'\s\.', '', regex = True)
     df['concat_reasons'] = df['concat_reasons'].str.replace('NA.', '')
 
@@ -130,8 +131,6 @@ def text_translation(df, cols):
 
     udf_translator = udf(translate_to_eng, StringType())
     spark_df = spark.createDataFrame(final_data)
-    # print(f"\n\nSpark DF: {spark_df.show(5)}\n\n")
-    print(f"\n\n\nSpark DF Here\n\n\n")
     spark_translated = spark_df.withColumn("translated", udf_translator('concat_reasons'))
 
     final_data = spark_translated.toPandas()
@@ -139,8 +138,11 @@ def text_translation(df, cols):
     return final_data
 
 def perform_sentimental_analysis(df):
+    print(f"Starting Senti\n\n")
+    df.to_csv('senti.csv', index=False)
     df['clean_translated'] = df.apply(lambda x: fix_translated(
         x['concat_reasons'], x['translated']), axis=1).str.lower()
+    print("Clean Translated\n\n\n")
     
     type_comments = ['no comment', 'compliment', 'areas for improvement',
                 'products/services to offer in the future', 'good service',
@@ -152,14 +154,11 @@ def perform_sentimental_analysis(df):
     df = df[~df['clean_translated'].str.strip().isin(type_comments)]
     df.rename({'clean_translated':'review'}, axis=1, inplace=True)
     reviews = df['review'].values
-    print("Got reviews")
 
     pipeline = joblib.load('models/pipeline.pkl')
     predictions = pipeline.predict(reviews)
-    print(f"Predictions: {predictions}")
     df['sentiment'] = predictions
     df.rename({'concat_reasons':'original'}, axis=1, inplace=True)
-    # df.drop('review', axis=1, inplace=True)
 
     # Cleaning the original reviews for wordcloud output
     stopwords = pd.read_csv('data/stopwords.txt', sep=' ', header=None)
@@ -171,10 +170,9 @@ def perform_sentimental_analysis(df):
     df['word_tokenized'] = df['original'].apply(word_tokenize)
     df['original'] = df['word_tokenized'].apply(lambda x: stop_remover(x, stop_list))
     df['original2'] = df['original'].apply(lambda x: ' '.join(x))
-    df_to_powerbi = df[['original2', 'sentiment']]
+    df_to_powerbi = df[['original2', 'translated', 'sentiment']]
     df_to_powerbi.rename({'original2': 'text'}, axis = 1, inplace = True)
     df_to_powerbi = df_to_powerbi[df_to_powerbi['text'] != '']
-    # st.write(df_to_powerbi.head(15))
     st.dataframe(df_to_powerbi.head(15))
     
     return df_to_powerbi
@@ -183,7 +181,6 @@ def process_data(df):
     st.title("Sentimental Analysis")
 
     try:
-        print("Showing wordcloud")
         st.sidebar.subheader("Data Sentimental Analysis")
         comment_columns = st.sidebar.multiselect(
             label="Comment Columns", 
@@ -193,27 +190,14 @@ def process_data(df):
         if st.sidebar.button("Process Data"):
             df_translated = text_translation(df, comment_columns)
             df_translated = df_translated[['concat_reasons', 'translated']]
-            # st.write(df_translated)
             show_wordcloud(df_translated)
-        # show_wordcloud(df)
     except Exception as e:
         print(e)
 
 def show_wordcloud(df):
-    # st.title("Sentimental Analysis")
     df_to_powerbi = perform_sentimental_analysis(df)
 
     try:
-        print("Showing wordcloud")
-        # col_select = st.sidebar.selectbox(
-        #     label="Select Column",
-        #     options=df_to_powerbi.columns.tolist()
-        # )
-        # target_col = st.sidebar.selectbox(
-        #     label="Target Column",
-        #     options=df_to_powerbi.columns.tolist()
-        # )
-
         df_cat = {}
         comb = {}
         long_str = {}
@@ -235,7 +219,7 @@ def show_wordcloud(df):
             st.subheader(f"Category {cat}")
             st.image(image=wordcloud[cat].to_image(), caption=f"Category {cat}")
     except Exception as e:
-        print(e) # sentiment
+        print(e) 
 
 
 
