@@ -14,7 +14,7 @@ RUN  pip3 install -r requirements.txt
 
 EXPOSE  8501
 
-CMD ["streamlit", "run", "data_visualization_app.py"]
+CMD ["streamlit", "run", "main.py"]
 
 
 
