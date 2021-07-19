@@ -5,3 +5,5 @@ venv
 *.csv
 test.py
 *.ipynb
+.env
+src/twitter/.env
