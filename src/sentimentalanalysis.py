@@ -162,7 +162,7 @@ def perform_sentimental_analysis(df):
     df.rename({'concat_reasons':'original'}, axis=1, inplace=True)
 
     # Cleaning the original reviews for wordcloud output
-    stopwords = pd.read_csv('data/stopwords.txt', sep=' ', header=None)
+    stopwords = pd.read_csv(f'{os.getcwd()}/src/data/stopwords.txt', sep=' ', header=None)
     stopwords.columns = ['words']
     custom = ['sana', 'po', 'yung', 'mas', 'ma', 'kasi', 'ninyo', 'kayo', 'nya', 'pag', 'naman', 'lang', 'no', 'comment']
     stop_list = stopwords['words'].values.tolist()  + custom
@@ -223,7 +223,6 @@ def show_wordcloud(df):
         print(e)
 
 def open_sentimental_analysis_page():
-    print(f"PWD: {os.getcwd()}\n\n")
     try:
         st.sidebar.subheader("Twitter Search")
         keywords = st.sidebar.text_input("Keyword")
