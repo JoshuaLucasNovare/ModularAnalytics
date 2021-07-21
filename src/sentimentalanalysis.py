@@ -224,14 +224,19 @@ def show_wordcloud(df):
 
 def open_sentimental_analysis_page():
     try:
-        st.sidebar.subheader("Twitter Search")
+        media = st.sidebar.selectbox(label="Media", options=["Twitter", "Inquirer"])
+        st.sidebar.subheader("Web Search")
         keywords = st.sidebar.text_input("Keyword")
 
         if keywords:
-            tweets = get_tweets(keywords)
-            print(f"Tweets: {tweets}")
-            st.write(tweets.head(15))
-            process_data(tweets)
+            if media == "Twitter":
+                tweets = get_tweets(keywords)
+                print(f"Tweets: {tweets}")
+                st.write(tweets.head(15))
+                process_data(tweets)
+
+            elif media == "Inquirer":
+                print(f"Inquirer.net")
     except Exception as e:
         print(f"Error Except: {e}")
 
