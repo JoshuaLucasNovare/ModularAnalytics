@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 from src.eda import show_eda
 from src.machinelearning import show_machinelearning_analysis
-from src.sentimentalanalysis import process_data
+from src.sentimentalanalysis import open_sentimental_analysis_page, process_data
 from src import design as design
 
 design.showHeader()
@@ -90,6 +90,6 @@ if DA_select == 'Sentiment Analysis':
     try:
         process_data(df)
     except Exception as e:
-        print(e)
+        open_sentimental_analysis_page()
 
 design.showFooter()

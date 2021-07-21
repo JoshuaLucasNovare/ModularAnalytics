@@ -16,6 +16,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # from translator import Translator
+from .twitter.twitter_search import get_tweets
 from textblob.translate import Translator
 from time import sleep
 from matplotlib.colors import LinearSegmentedColormap
@@ -155,13 +156,13 @@ def perform_sentimental_analysis(df):
     df.rename({'clean_translated':'review'}, axis=1, inplace=True)
     reviews = df['review'].values
 
-    pipeline = joblib.load('models/pipeline.pkl')
+    pipeline = joblib.load(f'{os.getcwd()}/src/models/pipeline.pkl')
     predictions = pipeline.predict(reviews)
     df['sentiment'] = predictions
     df.rename({'concat_reasons':'original'}, axis=1, inplace=True)
 
     # Cleaning the original reviews for wordcloud output
-    stopwords = pd.read_csv('data/stopwords.txt', sep=' ', header=None)
+    stopwords = pd.read_csv(f'{os.getcwd()}/src/data/stopwords.txt', sep=' ', header=None)
     stopwords.columns = ['words']
     custom = ['sana', 'po', 'yung', 'mas', 'ma', 'kasi', 'ninyo', 'kayo', 'nya', 'pag', 'naman', 'lang', 'no', 'comment']
     stop_list = stopwords['words'].values.tolist()  + custom
@@ -178,10 +179,10 @@ def perform_sentimental_analysis(df):
     return df_to_powerbi
 
 def process_data(df):
-    st.title("Sentimental Analysis")
+    st.title("Sentiment Analysis")
 
     try:
-        st.sidebar.subheader("Data Sentimental Analysis")
+        st.sidebar.subheader("Data Sentiment Analysis")
         comment_columns = st.sidebar.multiselect(
             label="Comment Columns", 
             options=df.columns
@@ -219,7 +220,20 @@ def show_wordcloud(df):
             st.subheader(f"Category {cat}")
             st.image(image=wordcloud[cat].to_image(), caption=f"Category {cat}")
     except Exception as e:
-        print(e) 
+        print(e)
+
+def open_sentimental_analysis_page():
+    try:
+        st.sidebar.subheader("Twitter Search")
+        keywords = st.sidebar.text_input("Keyword")
+
+        if keywords:
+            tweets = get_tweets(keywords)
+            print(f"Tweets: {tweets}")
+            st.write(tweets.head(15))
+            process_data(tweets)
+    except Exception as e:
+        print(f"Error Except: {e}")
 
 
 
