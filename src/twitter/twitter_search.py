@@ -1,13 +1,19 @@
+import os
 import tweepy
 import pandas as pd
 from decouple import config
 from .utils import get_language, remove_enter, translate_to_eng
 
 def tw_oauth():
-    consumer_key = config('consumerKey')
-    consumer_secret = config('consumerSecret')
-    access_token = config('accessToken')
-    access_token_secret = config('accessTokenSecret')
+    # consumer_key = config('consumerKey')
+    # consumer_secret = config('consumerSecret')
+    # access_token = config('accessToken')
+    # access_token_secret = config('accessTokenSecret')
+
+    consumer_key = os.environ['CONSUMER_KEY']
+    consumer_secret = os.environ['CONSUMER_SECRET']
+    access_token = os.environ['ACCESS_TOKEN']
+    access_token_secret = os.environ['ACCESS_TOKEN_SECRET']
 
     auth = tweepy.auth.OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_token, access_token_secret)
