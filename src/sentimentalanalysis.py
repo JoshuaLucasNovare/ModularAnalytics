@@ -179,10 +179,10 @@ def perform_sentimental_analysis(df):
     return df_to_powerbi
 
 def process_data(df):
-    st.title("Sentimental Analysis")
+    st.title("Sentiment Analysis")
 
     try:
-        st.sidebar.subheader("Data Sentimental Analysis")
+        st.sidebar.subheader("Data Sentiment Analysis")
         comment_columns = st.sidebar.multiselect(
             label="Comment Columns", 
             options=df.columns
