@@ -1,6 +1,4 @@
 import os
-os.environ["SPARK_HOME"] = "/home/jet-novare/Documents/spark-3.1.2-bin-hadoop3.2/"
-os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
 
 import findspark
 findspark.init()
