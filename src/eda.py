@@ -1,5 +1,6 @@
 import streamlit as st
 import plotly_express as px
+import plotly.figure_factory as ff
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -10,7 +11,7 @@ def show_eda(df, numeric_columns, non_numeric_columns):
     st.sidebar.subheader("Chart Types")
     chart_select = st.sidebar.selectbox(
         label="Select the chart type",
-        options=['Scatterplots', 'Lineplots', 'Histogram', 'Boxplot','Heatmap', 'Contour Plot', 'Pie Chart']
+        options=['Scatterplots', 'Lineplots', 'Histogram', 'Boxplot','Heatmap', 'Contour Plot', 'Pie Chart', 'Distplot']
     )
 
     if chart_select == 'Scatterplots':
@@ -92,6 +93,20 @@ def show_eda(df, numeric_columns, non_numeric_columns):
                 plot = px.pie(data_frame=df, values=values, names=labels)
                 st.plotly_chart(plot)
                 st.write('A pie chart (or a circle chart) is a circular statistical graphic, which is divided into slices to illustrate numerical proportion.')
+        except Exception as e:
+            print(e)
+
+    if chart_select == 'Distplot':
+        st.subheader("Distplot Settings")
+        try:
+            feat = st.multiselect(
+                label = "Choose features",
+                options = range(len(numeric_columns)),
+                format_func = lambda x: numeric_columns[x]
+            )
+            fig = ff.create_distplot([df[numeric_columns[c]] for c in feat], [numeric_columns[x] for x in feat])
+            st.plotly_chart(fig, use_container_width=True)
+            st.write('A Distplot or distribution plot, depicts the variation in the data distribution. The Distplot depicts the data by a histogram and a line in combination to it.')
         except Exception as e:
             print(e)
 

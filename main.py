@@ -32,6 +32,10 @@ if uploaded_file is not None:
     except Exception as e:
         print(e)
         df = pd.read_excel(uploaded_file)
+    try:
+        df = df.dropna(axis=1, how="all") #drops columns only if all values of col are: NaN, NA, etc.
+    except:
+        print(e)
 
 global numeric_columns
 global non_numeric_columns
