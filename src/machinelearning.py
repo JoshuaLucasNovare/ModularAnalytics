@@ -28,7 +28,7 @@ def show_machinelearning_analysis(df):
                 colname = testdf.columns[i]
                 not_correlated_features.add(colname)
     
-    st.write(df.drop(columns = not_correlated_features))
+    df = df.drop(columns = not_correlated_features)
     try:   
         X = df.iloc[:,1:].values
         y = df.iloc[:, 0:1].values
