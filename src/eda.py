@@ -1,3 +1,4 @@
+from altair.vegalite.v4.schema.core import BrushConfig
 import streamlit as st
 import plotly_express as px
 import plotly.figure_factory as ff
@@ -11,7 +12,7 @@ def show_eda(df, numeric_columns, non_numeric_columns):
     st.sidebar.subheader("Chart Types")
     chart_select = st.sidebar.selectbox(
         label="Select the chart type",
-        options=['Scatterplots', 'Lineplots', 'Histogram', 'Boxplot','Heatmap', 'Contour Plot', 'Pie Chart', 'Distplot']
+        options=['Scatterplots', 'Lineplots', 'Histogram', 'Boxplot','Heatmap', 'Contour Plot', 'Pie Chart', 'Distplot', 'Trendlines']
     )
 
     if chart_select == 'Scatterplots':
@@ -104,11 +105,30 @@ def show_eda(df, numeric_columns, non_numeric_columns):
                 options = range(len(numeric_columns)),
                 format_func = lambda x: numeric_columns[x]
             )
-            fig = ff.create_distplot([df[numeric_columns[c]] for c in feat], [numeric_columns[x] for x in feat])
+            fig = ff.create_distplot([df[numeric_columns[c]] for c in feat], [numeric_columns[x] for x in feat]) # change df['feature'] to df.iloc[~~] since duplicate columns might be possible
             st.plotly_chart(fig, use_container_width=True)
             st.write('A Distplot or distribution plot, depicts the variation in the data distribution. The Distplot depicts the data by a histogram and a line in combination to it.')
         except Exception as e:
             print(e)
+
+    if chart_select == 'Trendlines':
+        st.sidebar.subheader("Trendlines Settings")
+        type = st.sidebar.selectbox("Linear or Non-Linear?", options = ['Linear', 'Non-Linear'])
+        x = st.sidebar.selectbox("Horizontal Axis", options=numeric_columns)
+        y = st.sidebar.selectbox('Vertical Axis', options = numeric_columns)
+        if type == "Linear":
+            try:
+                fig = px.scatter(df, x=x, y=y, trendline="ols")
+                st.plotly_chart(fig)
+            except Exception as e:
+                print(e)
+        elif type == "Non-Linear":
+            try:
+                fig = px.scatter(df, x=x, y=y, trendline="lowess")
+                st.plotly_chart(fig)
+            except Exception as e:
+                print(e)
+
 
 
 
