@@ -128,6 +128,7 @@ def show_eda(df, numeric_columns, non_numeric_columns):
                 st.plotly_chart(fig)
             except Exception as e:
                 print(e)
+        st.write('A trend line, often referred to as a line of best fit, is a line that is used to represent the behavior of a set of data to determine if there is a certain pattern. Determining if a set of points exhibits a positive trend, a negative trend, or no trend at all.')
 
 
 
