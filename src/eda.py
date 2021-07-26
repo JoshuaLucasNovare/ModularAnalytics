@@ -12,7 +12,7 @@ def show_eda(df, numeric_columns, non_numeric_columns):
     st.sidebar.subheader("Chart Types")
     chart_select = st.sidebar.selectbox(
         label="Select the chart type",
-        options=['Scatterplots', 'Lineplots', 'Histogram', 'Boxplot','Heatmap', 'Contour Plot', 'Pie Chart', 'Distplot', 'Trendlines']
+        options=['Scatterplots', 'Lineplots', 'Histogram', 'Boxplot','Heatmap', 'Contour Plot', 'Pie Chart', 'Distplot', 'Trendlines', 'Violin plot']
     )
 
     if chart_select == 'Scatterplots':
@@ -130,6 +130,21 @@ def show_eda(df, numeric_columns, non_numeric_columns):
                 print(e)
         st.write('A trend line, often referred to as a line of best fit, is a line that is used to represent the behavior of a set of data to determine if there is a certain pattern. Determining if a set of points exhibits a positive trend, a negative trend, or no trend at all.')
 
+    if chart_select == "Violin plot":
+        st.sidebar.subheader("Violin plot Settings")
+        try:
+            feat = st.sidebar.selectbox(
+                label = "Choose feature",
+                options = range(len(numeric_columns)),
+                format_func = lambda x: numeric_columns[x]
+            )
+            fig = px.violin(df, y=numeric_columns[feat], box=True, # draw box plot inside the violin
+                points='all', # can be 'outliers', or False
+            )
+            st.plotly_chart(fig)
+            st.write('A violin plot is a method of plotting numeric data. It is similar to a box plot, with the addition of a rotated kernel density plot on each side. Violin plots are similar to box plots, except that they also show the probability density of the data at different values, usually smoothed by a kernel density estimator.')
+        except Exception as e:
+            print(e)
 
 
 
