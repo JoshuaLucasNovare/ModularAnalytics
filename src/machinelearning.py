@@ -8,6 +8,27 @@ import matplotlib.pyplot as plt
 model_scores = {}
 accuracy_scores = {}
 def show_machinelearning_analysis(df):
+    df = df.dropna(axis = 1, how='all')
+    columns = list(df.columns)
+    keyCol = st.selectbox(
+        label = "Choose a column to be the key column",
+        options = range(len(columns)),
+        format_func = lambda x: columns[x]
+    )
+    if keyCol != 0:
+        columns[keyCol], columns[0] = columns[0], columns[keyCol]
+        df = df.reindex(columns=columns)
+
+    not_correlated_features = set()
+    testdf = df.corr(method ='kendall') #methods = pearson : standard correlation coefficient; kendall : Kendall Tau correlation coefficient; spearman : Spearman rank correlation
+
+    for i in range(testdf.shape[0]):
+        for j in range(i):
+            if abs(testdf.iloc[i, j]) > 0.5:
+                colname = testdf.columns[i]
+                not_correlated_features.add(colname)
+    
+    st.write(df.drop(columns = not_correlated_features))
     try:   
         X = df.iloc[:,1:].values
         y = df.iloc[:, 0:1].values
