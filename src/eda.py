@@ -12,7 +12,7 @@ def show_eda(df, numeric_columns, non_numeric_columns):
     st.sidebar.subheader("Chart Types")
     chart_select = st.sidebar.selectbox(
         label="Select the chart type",
-        options=['Scatterplots', 'Lineplots', 'Histogram', 'Boxplot','Heatmap', 'Contour Plot', 'Pie Chart', 'Distplot', 'Trendlines', 'Violin plot']
+        options=['Scatterplots', 'Lineplots', 'Histogram', 'Boxplot','Heatmap', 'Contour Plot', 'Pie Chart', 'Distplot', 'Trendlines', 'Violin plot', 'Bubble Chart']
     )
 
     if chart_select == 'Scatterplots':
@@ -143,6 +143,38 @@ def show_eda(df, numeric_columns, non_numeric_columns):
             )
             st.plotly_chart(fig)
             st.write('A violin plot is a method of plotting numeric data. It is similar to a box plot, with the addition of a rotated kernel density plot on each side. Violin plots are similar to box plots, except that they also show the probability density of the data at different values, usually smoothed by a kernel density estimator.')
+        except Exception as e:
+            print(e)
+    
+    if chart_select == "Bubble Chart":
+        st.sidebar.subheader("Bubble Chart Settings")
+        x = st.sidebar.selectbox(
+            label = "X Axis",
+            options = range(len(numeric_columns)),
+            format_func = lambda a: numeric_columns[a]
+        )
+        y = st.sidebar.selectbox(
+            label = "Y Axis",
+            options = range(len(numeric_columns)),
+            format_func = lambda b: numeric_columns[b]
+        )
+        group = st.sidebar.selectbox(
+            label = "Group By",
+            options = range(len(non_numeric_columns)),
+            format_func = lambda c: non_numeric_columns[c]
+        )
+        size = st.sidebar.selectbox(
+            label = "Set Size",
+            options = range(len(numeric_columns)),
+            format_func = lambda d: numeric_columns[d]
+        )
+        try:
+            fig = px.scatter(df, x=numeric_columns[x], y=numeric_columns[y], 
+                color=non_numeric_columns[group], size = numeric_columns[size],
+                log_x=True, size_max=60
+            )
+            st.plotly_chart(fig)
+            st.write("A bubble chart is a type of chart that displays three dimensions of data. Each entity with its triplet of associated data is plotted as a disk that expresses two of the vᵢ values through the disk's xy location and the third through its size.")
         except Exception as e:
             print(e)
 
