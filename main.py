@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 from src.eda import show_eda
 from src.machinelearning import show_machinelearning_analysis
 from src.sentimentalanalysis import open_sentimental_analysis_page, process_data
-from src.classification import classification
 from src import design as design
 
 design.showHeader()
@@ -73,7 +72,7 @@ else:
 st.sidebar.subheader('Data Analysis')
 DA_select = st.sidebar.selectbox(
     label="Select the Data Analysis you want to see",
-    options=['Charts/EDA', 'Machine Learning', 'Sentiment Analysis', 'Classification']
+    options=['Charts/EDA', 'Machine Learning', 'Sentiment Analysis']
 )
 
 #Charts and EDA Choices
@@ -96,11 +95,5 @@ if DA_select == 'Sentiment Analysis':
         process_data(df)
     except Exception as e:
         open_sentimental_analysis_page()
-
-if DA_select == 'Classification':
-    try:
-        classification(df, non_numeric_columns)
-    except Exception as e:
-        print(e)
 
 design.showFooter()
