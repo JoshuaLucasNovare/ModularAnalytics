@@ -15,12 +15,14 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import plot_confusion_matrix, plot_roc_curve, plot_precision_recall_curve
 from sklearn.metrics import precision_score, recall_score 
 
+import altair as alt
+
 
 def show_eda(df, numeric_columns, non_numeric_columns):
     st.sidebar.subheader("Chart Types")
     chart_select = st.sidebar.selectbox(
         label="Select the chart type",
-        options=['Scatterplots', 'Lineplots', 'Histogram', 'Boxplot','Heatmap', 'Contour Plot', 'Pie Chart', 'Distplot', 'Trendlines', 'Violin plot', 'Bubble Chart', 'Classification']
+        options=['Scatterplots', 'Lineplots', 'Histogram', 'Boxplot','Heatmap', 'Contour Plot', 'Pie Chart', 'Distplot', 'Trendlines', 'Violin plot', 'Bubble Chart', 'Classification', "Cash Flow Projection"]
     )
 
     if chart_select == 'Scatterplots':
@@ -292,6 +294,77 @@ def show_eda(df, numeric_columns, non_numeric_columns):
                 st.write("Precision: ", precision_score(y_test, y_pred, labels=class_names).round(2))
                 st.write("Recall: ", recall_score(y_test, y_pred, labels=class_names).round(2))
                 plot_metrics(metrics)
+
+    if chart_select == "Cash Flow Projection":
+        st.sidebar.subheader("Cash Flow Settings")
+        cash = st.sidebar.selectbox(
+            label = "Select Cash Column",
+            options = range(len(df.columns)),
+            format_func = lambda x: df.columns[x]
+        )
+        date = st.sidebar.selectbox(
+            label = "Select Date Column",
+            options = range(len(df.columns)),
+            format_func = lambda y: df.columns[y]
+        )
+        inflow_outflow = st.sidebar.selectbox(
+            label = "Select inflow/outflow column",
+            options = range(len(df.columns)),
+            format_func = lambda z: df.columns[z]
+        )
+        try:
+            df.iloc[:,cash] = pd.to_numeric(df.iloc[:,cash])
+        except Exception as e:
+            print(e)
+        try:
+            df.iloc[:,date] = pd.to_datetime(df.iloc[:,date], errors='coerce', format="%Y-%m-%d")
+        except Exception as e:
+            print(e)
+
+        df['Year'] = df.iloc[:,date].dt.year
+        df['Month'] = df.iloc[:,date].dt.month
+
+        st.write(alt.Chart(df).mark_bar().encode(
+            alt.X("Year:N"),
+            y = 'count()',
+        ).properties(height=500, width=600))
+
+        st.write(alt.Chart(df).mark_bar().encode(
+            alt.X("Month:N"),
+            y = 'count()',
+        ).properties(height=500, width=600))
+
+        try:
+            cashflow = df.pivot_table(
+                index=[df.columns[date], df.columns[inflow_outflow]], 
+                values=df.columns[cash], 
+                aggfunc='sum'
+            ).reset_index()
+        except Exception as e:
+            print(e)
+
+        df2 = cashflow.pivot_table(
+            df.columns[cash], # value
+            [df.columns[date]], # index
+            df.columns[inflow_outflow] # columns
+        ).reset_index()
+        df2['cashflow'] = df2['cash_inflow'] - df2['cash_outflow']
+
+        st.write(alt.Chart(df2).mark_bar().encode(
+            alt.X("cashflow:Q", bin=alt.Bin(maxbins=70)),
+            y = 'count()',
+        ).properties(height=500, width=600))
+
+        cash_over_time = df2[df2['cashflow'] != 0]
+        cash_over_time = cash_over_time[cash_over_time["cashflow.transaction_date"].dt.year == 2019]
+
+        st.write(cash_over_time.dtypes)
+
+        st.write(alt.Chart(cash_over_time).mark_line(point=True).encode(
+            x='cashflow.transaction_date:T',
+            y=alt.Y('cashflow:Q'),
+            #tooltip=['cashflow', 'cashflow.transaction_date']
+        ).properties(height=500, width=1000))
 
 
 
