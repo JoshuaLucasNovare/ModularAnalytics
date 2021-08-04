@@ -6,6 +6,7 @@ import xgboost as xgb
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
+import streamlit as st
 
 
 from tqdm import tqdm
@@ -90,7 +91,7 @@ class PHBusinessCalendar(AbstractHolidayCalendar):
         Holiday('New Year Eve', month=12, day=31)
     ]
 
-def training(df):
+def training(data):
 
     X = data.drop(['total', 'date'], axis=1)
     y = data['total']
@@ -126,7 +127,7 @@ def cleaning(df):
 
     # df = df[df.columns[2:4]]
 
-    chunks = df["LPRODAT", "LOANAMT", "LOANTYPE", "LNINTRATEPA", "LNEFFINTRATE", "DGRANTED", "LOANPTRATE"]
+    chunks = df[["LPRODAT", "LOANTYPE", "DGRANTED", "LNINTRATEPA", "LOANAMT", "LNEFFINTRATE", "LOANPTRATE"]]
 
     # # Read the data
     # chunks = df(
@@ -139,7 +140,8 @@ def cleaning(df):
     # )
 
     # Append all chunks
-    df = pd.concat([chunk for chunk in chunks])
+    #df = pd.concat([chunk for chunk in chunks])
+    df = chunks
 
     # Convert LPRODAT dtypes to datetime
     df['LPRODAT'] = df['LPRODAT'].apply(
@@ -290,8 +292,12 @@ def forecast(df):
     predictions = predictions[predictions['Predicted'] > 0]
     predictions['Predicted'].plot(legend=True, marker='o')
     display = plt.plot(predictions)
-    st.pyplot(display)
+    #st.pyplot(predictions)
     #predictions.to_csv('output/prediction.csv', index = False)
 #     predictions.to_csv(os.path.join(save_path, 'prediction.csv'))
 
     #return display
+    fig, ax = plt.subplots()
+    ax.plot(predictions)
+    st.pyplot(fig)
+
