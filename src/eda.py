@@ -12,10 +12,11 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import plot_confusion_matrix, plot_roc_curve, plot_precision_recall_curve
-from sklearn.metrics import precision_score, recall_score 
+from sklearn.metrics import plot_confusion_matrix, plot_roc_curve, plot_precision_recall_curve, precision_score, recall_score, mean_squared_error, r2_score, mean_absolute_error
 
 import altair as alt
+from fbprophet import Prophet
+import datetime
 
 
 def show_eda(df, numeric_columns, non_numeric_columns):
@@ -358,16 +359,143 @@ def show_eda(df, numeric_columns, non_numeric_columns):
         cash_over_time = df2[df2['cashflow'] != 0]
         #cash_over_time = cash_over_time[cash_over_time["cashflow.transaction_date"] < '2019-01-01']
 
-        cash_over_time.rename(columns={'cashflow.transaction_date': 'date'}, inplace=True)
-
-        st.write(cash_over_time)
-        st.write(cash_over_time.dtypes)
+        cash_over_time.rename(columns={f'{df.columns[date]}': 'date'}, inplace=True)
 
         st.write(alt.Chart(cash_over_time).mark_line(point=True).encode(
             x='date:T',
             y=alt.Y('cashflow:Q'),
             tooltip=['cashflow', 'date']
         ).properties(height=500, width=1000))
+
+        historical = cash_over_time
+
+        # Prophet Training and Forecasting
+
+        def train_model(data, holidays=False, ws=False, ys=False, ds=False, ms=False, iw=0.85):
+            ts = data
+            ts.columns = ['ds', 'y']
+            
+            if isinstance(holidays, pd.DataFrame):
+                model = Prophet(weekly_seasonality=ws, yearly_seasonality=ys, daily_seasonality=ds, interval_width=iw, holidays=holidays)
+            else:
+                model = Prophet(weekly_seasonality=ws, yearly_seasonality=ys, daily_seasonality=ds, interval_width=iw)
+            if ms:
+                model.add_seasonality(name='monthly', period=30.5, fourier_order=5)
+            model = model.fit(ts)
+            return model
+
+
+        def predict(model, n):
+            forecast = model.make_future_dataframe(periods=n, freq='D')
+            predictions = model.predict(forecast)
+            figure = model.plot(predictions)
+            plt.title('Cash Flow Projection', fontsize=25)
+            return predictions
+
+        def custom_predict(model, data):
+            data = data[['date']]
+            data.columns = ['ds']
+            predictions = model.predict(data)
+            return predictions
+
+        def evaluate(y_true, yhat):
+            rmse = np.sqrt(mean_squared_error(y_true, yhat))
+            r2 = r2_score(y_true, yhat)
+            mae = mean_absolute_error(y_true, yhat)
+            metrics = [{
+                'Root Mean Squared Error' : rmse,
+                'R-squared' : r2,
+                'Mean Absolute Error' : mae,
+            }]
+
+            performance = pd.DataFrame(metrics)
+            return performance
+
+        def create_holidays(start_year, end_year):
+            holiday_df = []
+            holidays = [("New Year's Day", '-01-01'), ("Maundy Thursday", '-04-01'), ("Good Friday", '-04-02'), 
+                        ("Araw ng Kagitingan", '-04-09'), ("Labor Day", '-05-01'), ("Independence Day", '-06-12'), 
+                        ("National Heroes’ Day", '-08-30'), ("Bonifacio Day", '-11-30'), ("Christmas Day", '-12-25'),
+                        ("Rizal Day", '-12-30')]
+                        
+            for year in range(start_year, end_year+1, 1):
+                for h in holidays:
+                    holiday_df.append({
+                        'ds':str(year)+h[1],
+                        'holiday':h[0],
+                        'lower_window': 0,
+                        'upper_window': 0,
+                    })
+  
+            holiday_df = pd.DataFrame(holiday_df)
+            holiday_df['ds'] = pd.to_datetime(holiday_df.ds)
+            return holiday_df
+
+        holiday_df = create_holidays(2018, 2022)
+
+        model = train_model(cash_over_time[['date', 'cashflow']], ws=True, ms=True, iw=0.95, holidays=holiday_df)
+        predictions = predict(model, 7)
+        model_predictions = predict(model, 30)
+
+        st.write(model.plot_components(predictions.reset_index()))
+
+        train_set = cash_over_time[cash_over_time['date'].dt.year != 2021]
+        test_set = cash_over_time[cash_over_time['date'].dt.year == 2021]
+
+        model = train_model(train_set[['date', 'cashflow']], ws=True, ms=True, iw=0.95)
+        predictions = custom_predict(model, test_set)
+        historical_set = historical.set_index('date')
+        fig, ax = plt.subplots()
+        ax = historical_set['cashflow'].plot(legend=True, label='historical', figsize=(15,5))
+        st.pyplot(fig)
+        predictions = predictions.set_index('ds')
+        fig, ax = plt.subplots()
+        ax = predictions['yhat'].plot(legend=True, label='forecast')
+        st.pyplot(fig)
+        fig, ax = plt.subplots()
+        ax = plt.fill_between(predictions.index, predictions['yhat_lower'], predictions['yhat_upper'], color='k', alpha=.15)
+        st.pyplot(fig)
+
+        result = model_predictions.reset_index()
+        standard_cols = ['date', 'value', 'flag']
+
+        historical = cash_over_time[['date', 'cashflow']]
+        historical['flag'] = 'historical'
+
+        forecast = result[-30:][['ds', 'yhat']]
+        forecast['flag'] = 'forecast'
+
+        upper = result[-30:][['ds', 'yhat_upper']]
+        upper['flag'] = 'upper'
+
+        lower = result[-30:][['ds', 'yhat_lower']]
+        lower['flag'] = 'lower'
+
+        historical.columns = standard_cols
+        forecast.columns = standard_cols
+        upper.columns = standard_cols
+        lower.columns = standard_cols
+
+        new_forecast = forecast.append(historical[-1:])
+        new_forecast['flag'] = new_forecast['flag'].replace(['historical', 'forecast'])
+
+        new_upper = upper.append(historical[-1:])
+        new_upper['flag'] = new_upper['flag'].replace(['historical', 'upper'])
+
+        new_lower = lower.append(historical[-1:])
+        new_lower['flag'] = new_lower['flag'].replace(['historical', 'lower'])
+
+        power_bi = pd.concat([new_forecast, new_upper, new_lower, historical], axis=0)
+        fig, ax = plt.subplots()
+        ax = sns.lineplot(data=power_bi, x='date', y='value', hue='flag')
+        st.write(fig)
+
+        # Model Evaluation
+        eval_perf = predictions[['yhat']].reset_index()
+        eval_perf = eval_perf.merge(test_set, left_on='ds', right_on='date', how='left').drop(['date', 'cash_inflow', 'cash_outflow'], axis=1)
+        eval_perf.columns = ['date', 'yhat', 'y']
+        st.write(evaluate(eval_perf['y'], eval_perf['yhat']))
+        
 
 
 
