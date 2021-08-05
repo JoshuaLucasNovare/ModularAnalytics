@@ -9,6 +9,7 @@
 4. Set environment variable `JAVA_HOME` to full path of Java bin folder.
 5. Update VStudio Build Tools with Desktop Development with C++ with Windows 10 SDK and MSVC v142 - VS 2019 C++...
 6. Install requirements using `pip install -r requirements.txt`
+7. Use conda to install fbprophet: `conda install -c conda-forge fbprophet`
 
 
 ## Execution
