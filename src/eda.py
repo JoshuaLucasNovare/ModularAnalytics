@@ -317,7 +317,7 @@ def show_eda(df, numeric_columns, non_numeric_columns):
         except Exception as e:
             print(e)
         try:
-            df.iloc[:,date] = pd.to_datetime(df.iloc[:,date], errors='coerce', format="%Y-%m-%d")
+            df.iloc[:,date] = pd.to_datetime(df.iloc[:,date])
         except Exception as e:
             print(e)
 
@@ -356,14 +356,17 @@ def show_eda(df, numeric_columns, non_numeric_columns):
         ).properties(height=500, width=600))
 
         cash_over_time = df2[df2['cashflow'] != 0]
-        cash_over_time = cash_over_time[cash_over_time["cashflow.transaction_date"].dt.year == 2019]
+        #cash_over_time = cash_over_time[cash_over_time["cashflow.transaction_date"] < '2019-01-01']
 
+        cash_over_time.rename(columns={'cashflow.transaction_date': 'date'}, inplace=True)
+
+        st.write(cash_over_time)
         st.write(cash_over_time.dtypes)
 
         st.write(alt.Chart(cash_over_time).mark_line(point=True).encode(
-            x='cashflow.transaction_date:T',
+            x='date:T',
             y=alt.Y('cashflow:Q'),
-            #tooltip=['cashflow', 'cashflow.transaction_date']
+            tooltip=['cashflow', 'date']
         ).properties(height=500, width=1000))
 
 
