@@ -119,14 +119,6 @@ def training(data):
 def cleaning(df):
 
     # Read the data
-    #chunks = df
-
-    # df = df["LPRODAT", "LOANAMT", "LOANTYPE", "LNINTRATEPA", "LNEFFINTRATE", "DGRANTED", "LOANPTRATE"]
-
-    # df = df.reindex(columns=["LPRODAT", "LOANAMT", "LOANTYPE", "LNINTRATEPA", "LNEFFINTRATE", "DGRANTED", "LOANPTRATE"])
-
-    # df = df[df.columns[2:4]]
-
     chunks = df[["LPRODAT", "LOANTYPE", "DGRANTED", "LNINTRATEPA", "LOANAMT", "LNEFFINTRATE", "LOANPTRATE"]]
 
     # # Read the data
@@ -229,10 +221,10 @@ def training(data):
 
     X = data.drop(['total', 'date'], axis=1)
     y = data['total']
-    X_train = X.iloc[:len(data)-35]
-    X_test = X.iloc[len(data)-35:]
-    y_train = y.iloc[:len(data)-35]
-    y_test = y.iloc[len(data)-35:]
+    X_train = X.iloc[:len(data)-time]
+    X_test = X.iloc[len(data)-time:]
+    y_train = y.iloc[:len(data)-time]
+    y_test = y.iloc[len(data)-time:]
 
     scaler = StandardScaler()
 
@@ -252,11 +244,38 @@ def training(data):
 
 # def forecast(file_path, f, save_path):
 def forecast(df):
+
+    st.sidebar.subheader("Timeframe")
+    timeframe_select = st.sidebar.selectbox(
+        label="Select timeframe",
+        options=['3 months', '6 months', '1 year', '2 years']
+    )
+    
+    global time
+
     data = cleaning(df)
 
     latest = data.index[-1:][0]
-    tomorrow = data.index[-1:][0] + timedelta(days=1)
-    future = data.index[-1:][0] + timedelta(days=35)
+
+    if timeframe_select == '3 months':
+        time = 90
+        tomorrow = data.index[-1:][0] + timedelta(days=1)
+        future = data.index[-1:][0] + timedelta(days=time)
+    
+    if timeframe_select == '6 months':
+        time = 180
+        tomorrow = data.index[-1:][0] + timedelta(days=1)
+        future = data.index[-1:][0] + timedelta(days=time)
+    
+    if timeframe_select == '1 year':
+        time = 365
+        tomorrow = data.index[-1:][0] + timedelta(days=1)
+        future = data.index[-1:][0] + timedelta(days=time)
+    
+    if timeframe_select == '2 years':
+        time = 730
+        tomorrow = data.index[-1:][0] + timedelta(days=1)
+        future = data.index[-1:][0] + timedelta(days=time)
 
     PH_BD = CustomBusinessDay(calendar=PHBusinessCalendar())
     s = pd.date_range(tomorrow, end=future, freq=PH_BD)
@@ -291,13 +310,15 @@ def forecast(df):
     predictions.drop('Test', axis=1, inplace=True)
     predictions = predictions[predictions['Predicted'] > 0]
     predictions['Predicted'].plot(legend=True, marker='o')
-    display = plt.plot(predictions)
-    #st.pyplot(predictions)
     #predictions.to_csv('output/prediction.csv', index = False)
 #     predictions.to_csv(os.path.join(save_path, 'prediction.csv'))
 
     #return display
     fig, ax = plt.subplots()
-    ax.plot(predictions)
+    ax.plot(predictions, marker='o')
+    ax.set_title('Time Series Forecast') 
+    plt.rcParams["xtick.labelsize"] = 5
+    # plt.rcParams["figure.figsize"] = (8, 4)
     st.pyplot(fig)
+    st.dataframe(predictions)
 
