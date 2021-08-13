@@ -307,6 +307,7 @@ def forecast(df):
     predictions = pd.DataFrame(y_test)
     predictions.columns = ['Test']
     predictions['Predicted'] = y_pred
+    predictions = predictions[predictions['Predicted'] > 0]
 
     res = predictions['Test'] - predictions['Predicted'] # added a residual computation
 
@@ -315,13 +316,12 @@ def forecast(df):
     alpha = 0.05
 
     bootstrap = np.asarray([np.random.choice(res, size=res.shape) for _ in range(100)])
-    q_bootstrap = np.quantile(bootstrap, q=[alpha/2, 1-alpha/2], axis=1)
+    q_bootstrap = np.quantile(bootstrap, q=[alpha/2, 1-alpha/2], axis=0)
 
     #y_pred = pd.Series(model.predict(X_test), index=X_test.index)
     y_lower = predictions['Predicted'] + q_bootstrap[0].mean()
     y_upper = predictions['Predicted'] + q_bootstrap[1].mean()
 
-    predictions = predictions[predictions['Predicted'] > 0]
     # predictions['Predicted'].plot(legend=True, marker='o')
 
     #predictions.to_csv('output/prediction.csv', index = False)
@@ -331,7 +331,7 @@ def forecast(df):
     fig, ax = plt.subplots()
     ax.plot(predictions, marker='o')
     ax.fill_between(predictions.index, y_lower, y_upper, alpha=0.3)
-    st.write(predictions.index)
+    # st.write(predictions.index)
     # ax.fill_between(predictions.index, predictions['Predicted']-100000, predictions['Predicted']+100000, alpha=0.3)
     ax.set_title('Time Series Forecast') 
     plt.rcParams["xtick.labelsize"] = 5
