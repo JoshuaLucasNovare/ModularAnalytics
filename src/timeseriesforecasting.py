@@ -245,13 +245,19 @@ def training(data):
 # def forecast(file_path, f, save_path):
 def forecast(df):
 
-    st.sidebar.subheader("Timeframe")
+    st.sidebar.subheader("Select Timeframe")
     timeframe_select = st.sidebar.selectbox(
-        label="Select timeframe",
+        label="Select Timeframe",
         options=['3 months', '6 months', '1 year', '2 years']
     )
+
+    st.sidebar.subheader("Select Confidence Level")
+    confidence_level_select = st.sidebar.selectbox(
+        label="Select Confidence Level",
+        options=['90%', '95%', '99%']
+    )
     
-    global time
+    global time, confidence_level
 
     data = cleaning(df)
 
@@ -318,24 +324,38 @@ def forecast(df):
     bootstrap = np.asarray([np.random.choice(res, size=res.shape) for _ in range(100)])
     q_bootstrap = np.quantile(bootstrap, q=[alpha/2, 1-alpha/2], axis=0)
 
+    if confidence_level_select == "90%":
+        confidence_level = 1.645
+
+    if confidence_level_select == "95%":
+        confidence_level = 1.96
+
+    if confidence_level_select == "99%":
+        confidence_level = 2.576
+
+    res_std = res.std() 
+    y_upper = predictions['Predicted'] + (confidence_level * res_std)
+    y_lower = predictions['Predicted'] - (confidence_level * res_std)
+
     #y_pred = pd.Series(model.predict(X_test), index=X_test.index)
-    y_lower = predictions['Predicted'] + q_bootstrap[0].mean()
-    y_upper = predictions['Predicted'] + q_bootstrap[1].mean()
+    # y_lower = predictions['Predicted'] + q_bootstrap[0].mean()
+    # y_upper = predictions['Predicted'] + q_bootstrap[1].mean()
 
     # predictions['Predicted'].plot(legend=True, marker='o')
 
     #predictions.to_csv('output/prediction.csv', index = False)
-#     predictions.to_csv(os.path.join(save_path, 'prediction.csv'))
+    #predictions.to_csv(os.path.join(save_path, 'prediction.csv'))
 
-    #return display
     fig, ax = plt.subplots()
     ax.plot(predictions, marker='o')
     ax.fill_between(predictions.index, y_lower, y_upper, alpha=0.3)
-    # st.write(predictions.index)
-    # ax.fill_between(predictions.index, predictions['Predicted']-100000, predictions['Predicted']+100000, alpha=0.3)
     ax.set_title('Time Series Forecast') 
     plt.rcParams["xtick.labelsize"] = 5
     # plt.rcParams["figure.figsize"] = (8, 4)
     st.pyplot(fig)
+    st.header("Prediction Values")
     st.dataframe(predictions)
-
+    st.header("Predicted Upper Values")
+    st.write(y_upper)
+    st.header("Predicted Lower Values")
+    st.write(y_lower)
