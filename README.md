@@ -6,6 +6,7 @@
 2. Download and install Java version 8 or higher.
 3. Set environment variable `SPARK_HOME` to full path where Apache Spark was saved.
 4. Set environment variable `JAVA_HOME` to full path of Java bin folder.
+5. Pandas Profiling requires a huge amount of hardware resource failing to have one will result to an error.
 
 ## Execution
 1. Run `streamlit run main.py`.
