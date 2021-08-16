@@ -91,7 +91,7 @@ def show_eda(df, numeric_columns, non_numeric_columns):
             print(e)
     if chart_select == 'Detailed Column Analysis':
         try:
-            pr = ProfileReport(df, minimal=True)
+            pr = ProfileReport(df, explorative=True)
             st.header('**Pandas Profiling Report**')
             st_profile_report(pr)
         except Exception as e:
