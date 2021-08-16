@@ -4,13 +4,15 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from pandas_profiling import ProfileReport
+from streamlit_pandas_profiling import st_profile_report
 
 
 def show_eda(df, numeric_columns, non_numeric_columns):
     st.sidebar.subheader("Chart Types")
     chart_select = st.sidebar.selectbox(
         label="Select the chart type",
-        options=['Scatterplots', 'Lineplots', 'Histogram', 'Boxplot','Heatmap', 'Contour Plot', 'Pie Chart']
+        options=['Scatterplots', 'Lineplots', 'Histogram', 'Boxplot','Heatmap', 'Contour Plot', 'Pie Chart', 'Detailed Column Analysis']
     )
 
     if chart_select == 'Scatterplots':
@@ -87,7 +89,14 @@ def show_eda(df, numeric_columns, non_numeric_columns):
                 st.plotly_chart(plot)
         except Exception as e:
             print(e)
-
+    if chart_select == 'Detailed Column Analysis':
+        try:
+            pr = ProfileReport(df, explorative=True)
+            st.header('**Pandas Profiling Report**')
+            st_profile_report(pr)
+        except Exception as e:
+            print(e)          
+	    
 
 
 
