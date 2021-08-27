@@ -12,11 +12,9 @@ def translate_to_eng(paragraph):
 
     for sentence in paragraph:
         try:
-            sleep(1.0)
             sentence = sentence.strip()
             en_blob = Translator()
-            translated.append(str(en_blob.translate(sentence, from_lang=get_language(sentence), to_lang='en')))
-            sleep(1.0)
+            translated.append(str(en_blob.translate(sentence, from_lang='tl', to_lang='en')))
         except Exception as e:
             print(e)
 

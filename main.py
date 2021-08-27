@@ -8,11 +8,13 @@ import matplotlib.pyplot as plt
 from src.eda import show_eda
 from src.machinelearning import show_machinelearning_analysis
 from src.sentimentalanalysis import open_sentimental_analysis_page, process_data
+from src.sentimentanalysisdemo import run_demo
 from src import design as design
 
 design.showHeader()
 # configuration
 st.set_option('deprecation.showfileUploaderEncoding', False)
+# st.set_page_config(page_title='Title Here',layout="wide")
 
 # title of the app
 st.title("Data Visualization App")
@@ -45,7 +47,7 @@ table_select = st.sidebar.selectbox(
 if table_select == 'Show':
     try:
         st.subheader("First 15 Rows")
-        st.write(df.head(15))
+        st.dataframe(data=df['feedback'].head(50))
         numeric_columns = list(df.select_dtypes(['float', 'int']).columns)
         non_numeric_columns = list(df.select_dtypes(['object']).columns)
         non_numeric_columns.append(None)
@@ -68,7 +70,7 @@ else:
 st.sidebar.subheader('Data Analysis')
 DA_select = st.sidebar.selectbox(
     label="Select the Data Analysis you want to see",
-    options=['Charts/EDA', 'Machine Learning', 'Sentiment Analysis']
+    options=['Charts/EDA', 'Machine Learning', 'Sentiment Analysis', 'Sentiment Analysis Demo']
 )
 
 #Charts and EDA Choices
@@ -91,5 +93,12 @@ if DA_select == 'Sentiment Analysis':
         process_data(df)
     except Exception as e:
         open_sentimental_analysis_page()
+
+# Sentiment Analysis Demo
+if DA_select == 'Sentiment Analysis Demo':
+    try:
+        run_demo(df) 
+    except Exception as e:
+        pass
 
 design.showFooter()

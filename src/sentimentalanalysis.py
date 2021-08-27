@@ -1,7 +1,7 @@
 import os
 
 import findspark
-findspark.init()
+findspark.init(os.environ['SPARK_HOME'])
 import joblib
 import re
 import logging
@@ -137,11 +137,9 @@ def text_translation(df, cols):
     return final_data
 
 def perform_sentimental_analysis(df):
-    print(f"Starting Senti\n\n")
     df.to_csv('senti.csv', index=False)
     df['clean_translated'] = df.apply(lambda x: fix_translated(
         x['concat_reasons'], x['translated']), axis=1).str.lower()
-    print("Clean Translated\n\n\n")
     
     type_comments = ['no comment', 'compliment', 'areas for improvement',
                 'products/services to offer in the future', 'good service',
