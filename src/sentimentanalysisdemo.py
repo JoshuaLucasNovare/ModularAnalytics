@@ -3,6 +3,7 @@ import os
 import findspark
 findspark.init(os.environ['SPARK_HOME'])
 import joblib
+import time
 import re
 import logging
 import string
@@ -60,16 +61,56 @@ def run_demo(df):
         )
         
         if st.sidebar.button("Process Data"):
+            df['sentiment'] = ''
             feedbacks = df['feedback'].values
-            for feedback in feedbacks:
-            	st.text(f'Feedback: {feedback}')
-            	translated = translate_to_eng(feedback)
-            	st.text(f'English Transation: {translated[0]}')
-            	vect = vectorizer.transform(translated)
-            	st.text(f'Sentiment: {pipeline.predict(vect)[0]}')
-            	st.markdown("""---""")
+            f = st.empty()
+            t = st.empty()
+            s = st.empty()
+            for index, row in df.iterrows(): # feedback in feedbacks:
+                f.markdown(f'Feedback: {row["feedback"]}')
+                # time.sleep(1.0)
+                translated = translate_to_eng(row["feedback"])
+                t.markdown(f'English Transation: {translated}')
+                # time.sleep(1.0)
+                vect = vectorizer.transform(translated)
+                sentiment = pipeline.predict(vect)[0]
+                s.markdown(f'Sentiment: {sentiment}')
+                # time.sleep(1.0)
+                f.markdown('')
+                t.markdown('')
+                s.markdown('')
+                df.at[index, 'sentiment'] = sentiment
+                # time.sleep(1.0)
+            st.dataframe(data=df)
+            show_wordcloud(df)
     except Exception as e:
         print(e)
+
+def show_wordcloud(df):
+
+    try:
+        df_cat = {}
+        comb = {}
+        long_str = {}
+        wordcloud = {}
+        categories = list(set(df["sentiment"].tolist()))
+
+        colors = ["#BF0A30", "#002868"]
+        cmap = LinearSegmentedColormap.from_list("mycmap", colors)
+
+        for cat in categories:
+            df_cat[cat] = df[df["sentiment"] == cat]
+            comb[cat] = df_cat[cat]["feedback"].values.tolist()
+            long_str[cat] = ' '.join(comb[cat])
+            wordcloud[cat] = WordCloud(background_color="white", colormap=cmap, width=1000, 
+                     height=300, max_font_size=500, relative_scaling=0.3, 
+                     min_font_size=5)
+            wordcloud[cat].generate(long_str[cat])
+
+            st.subheader(f"Category {cat}")
+            st.image(image=wordcloud[cat].to_image(), caption=f"Category {cat}")
+    except Exception as e:
+        print(f'Exception: {e}')
 
 
 

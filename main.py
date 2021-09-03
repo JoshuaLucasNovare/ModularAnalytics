@@ -46,8 +46,8 @@ table_select = st.sidebar.selectbox(
 
 if table_select == 'Show':
     try:
-        st.subheader("First 15 Rows")
-        st.dataframe(data=df['feedback'].head(50))
+        # st.subheader("First 15 Rows")
+        st.dataframe(data=df.head(50))
         numeric_columns = list(df.select_dtypes(['float', 'int']).columns)
         non_numeric_columns = list(df.select_dtypes(['object']).columns)
         non_numeric_columns.append(None)
