@@ -50,6 +50,13 @@ def translate_to_eng(paragraph):
 
     return translated
 
+def stop_remover(x, stop_list):
+    lst = []
+    for i in x:
+        if i.lower() not in stop_list:
+            lst.append(i.lower())
+    return lst
+
 def run_demo(df):
     st.title("Sentiment Analysis")
 
@@ -82,6 +89,18 @@ def run_demo(df):
                 df.at[index, 'sentiment'] = sentiment
                 # time.sleep(1.0)
             st.dataframe(data=df)
+
+            # Cleaning the original reviews for wordcloud output
+            stopwords = pd.read_csv(f'{os.getcwd()}/src/data/stopwords.txt', sep=' ', header=None)
+            stopwords.columns = ['words']
+            custom = ['sana', 'po', 'yung', 'mas', 'ma', 'kasi', 'ninyo', 'kayo', 'nya', 'pag', 'naman', 'lang', 'no', 'comment']
+            stop_list = stopwords['words'].values.tolist()  + custom
+        
+            # Applying Word Tokenization
+            df['word_tokenized'] = df['feedback'].apply(word_tokenize)
+            df['feedback'] = df['word_tokenized'].apply(lambda x: stop_remover(x, stop_list))
+            df['feedback'] = df['feedback'].apply(lambda x: ' '.join(x))
+
             show_wordcloud(df)
     except Exception as e:
         print(e)
