@@ -68,14 +68,14 @@ def run_demo(df):
             s = st.empty()
             for index, row in df.iterrows(): # feedback in feedbacks:
                 f.markdown(f'Feedback: {row["feedback"]}')
-                # time.sleep(1.0)
+                time.sleep(1.0)
                 translated = translate_to_eng(row["feedback"])
                 t.markdown(f'English Transation: {translated}')
-                # time.sleep(1.0)
+                time.sleep(1.0)
                 vect = vectorizer.transform(translated)
                 sentiment = pipeline.predict(vect)[0]
                 s.markdown(f'Sentiment: {sentiment}')
-                # time.sleep(1.0)
+                time.sleep(1.0)
                 f.markdown('')
                 t.markdown('')
                 s.markdown('')
