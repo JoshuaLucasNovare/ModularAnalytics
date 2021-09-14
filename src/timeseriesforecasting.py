@@ -8,18 +8,13 @@ import matplotlib.pyplot as plt
 import os
 import streamlit as st
 
-
 from tqdm import tqdm
 from sklearn.impute import SimpleImputer 
-from sklearn.metrics import mean_squared_error
-from sklearn.metrics import mean_absolute_error
-from statsmodels.graphics.tsaplots import plot_acf
-from statsmodels.graphics.tsaplots import plot_pacf
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import  GridSearchCV
-from sklearn.preprocessing import StandardScaler
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import PCA
 
@@ -316,6 +311,9 @@ def forecast(df):
     predictions = predictions[predictions['Predicted'] > 0]
 
     res = predictions['Test'] - predictions['Predicted'] # added a residual computation
+    rmse = np.sqrt(mean_squared_error(predictions['Test'], predictions['Predicted']))
+    mae = mean_absolute_error(predictions['Test'], predictions['Predicted'])
+    r2score = r2_score(predictions['Test'], predictions['Predicted'])
 
     predictions.drop('Test', axis=1, inplace=True)
 
@@ -353,6 +351,12 @@ def forecast(df):
     plt.rcParams["xtick.labelsize"] = 5
     # plt.rcParams["figure.figsize"] = (8, 4)
     st.pyplot(fig)
+
+    st.header("Accuracy Metrics")
+    st.write("RMSE:", rmse)
+    st.write("MAE:", mae)
+    st.write("R2:", r2score)
+
     st.header("Prediction Values")
     st.dataframe(predictions)
     st.header("Predicted Upper Values")

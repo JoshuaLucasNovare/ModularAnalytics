@@ -15,11 +15,8 @@ design.showHeader()
 # configuration
 st.set_option('deprecation.showfileUploaderEncoding', False)
 
-# title of the app
-st.title("Data Visualization App")
-
 # Add a sidebar
-st.sidebar.subheader("Visualization Settings")
+st.sidebar.subheader("Settings")
 
 # Setup file upload
 uploaded_file = st.sidebar.file_uploader(
@@ -69,8 +66,11 @@ else:
 st.sidebar.subheader('Data Analysis')
 DA_select = st.sidebar.selectbox(
     label="Select the Data Analysis you want to see",
-    options=['Charts/EDA', 'Machine Learning', 'Sentiment Analysis', 'Time Series Forecasting']
+    options=['Exploratory Data Analysis', 'Machine Learning', 'Sentiment Analysis', 'Time Series Forecasting']
 )
+
+# title of the app
+st.title(DA_select)
 
 #Charts and EDA Choices
 if DA_select =='Charts/EDA':
