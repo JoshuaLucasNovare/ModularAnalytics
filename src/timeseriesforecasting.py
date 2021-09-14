@@ -1,20 +1,36 @@
+# ==================================================================================================
+# Import Libraries
+# ==================================================================================================
 import math
 import time
 import numpy as np
+from numpy import mean
+from numpy import std
 import pandas as pd
-import xgboost as xgb
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 import streamlit as st
+import plotly_express as px
 
 from tqdm import tqdm
 from sklearn.impute import SimpleImputer 
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import  GridSearchCV
+from sklearn.model_selection import  GridSearchCV, KFold, RepeatedKFold, cross_val_score, train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, OneHotEncoder
+
+import xgboost as xgb
+from lightgbm import LGBMRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.svm import SVR
+from sklearn.neural_network import MLPRegressor
+from sklearn.ensemble import StackingRegressor, VotingRegressor
+
+from statsmodels.graphics.tsaplots import plot_acf
+from statsmodels.graphics.tsaplots import plot_pacf
 from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import PCA
 
@@ -26,9 +42,10 @@ from pandas.tseries.offsets import CustomBusinessDay
 import warnings
 warnings.filterwarnings('ignore')
 tqdm.pandas()
-#%matplotlib inline
 
-
+# ==================================================================================================
+# Create Features
+# ==================================================================================================
 def create_features(df, label=None, persist_cols=None):
     """
     Create time series features from datetime index
@@ -54,6 +71,9 @@ def rmsle(y, y_pred):
                     ** 2.0 for i, pred in enumerate(y_pred)]
     return (sum(terms_to_sum) * (1.0/len(y))) ** 0.5
 
+# ==================================================================================================
+# PH Business Calendar
+# ==================================================================================================
 class PHBusinessCalendar(AbstractHolidayCalendar):
     rules = [
         Holiday('New Year', month=1, day=1),
@@ -86,254 +106,522 @@ class PHBusinessCalendar(AbstractHolidayCalendar):
         Holiday('New Year Eve', month=12, day=31)
     ]
 
-def training(data):
-
-    X = data.drop(['total', 'date'], axis=1)
-    y = data['total']
-    X_train = X.iloc[:len(data)-35]
-    X_test = X.iloc[len(data)-35:]
-    y_train = y.iloc[:len(data)-35]
-    y_test = y.iloc[len(data)-35:]
-
-    scaler = StandardScaler()
-
-    X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test)
-
-    pca = PCA(n_components=0.85)
-    new_Xtrain = pca.fit_transform(X_train)
-    new_Xtest = pca.transform(X_test)
-
-    reg = xgb.XGBRegressor(
-        n_estimators=1500, objective='reg:squarederror', reg_alpha=0.5)
-    reg.fit(new_Xtrain, y_train, verbose=False)
-
+# ==================================================================================================
+# Data Cleaning
+# ==================================================================================================
+def cleaning(dataframe):
+    df = dataframe
+    df = df[["zhdr_lpro.lprodat", "zhdr_lpro.loanamt", "zhdr_lpro.loantype", "zhdr_lpro.lnintratepa", "zhdr_lpro.lfeffintrate",
+             "zhdr_lpro.dgranted", "zhdr_lpro.loanptrate"]]
     
-    return reg, new_Xtest, y_test
-
-def cleaning(df):
-
-    # Read the data
-    chunks = df[["LPRODAT", "LOANTYPE", "DGRANTED", "LNINTRATEPA", "LOANAMT", "LNEFFINTRATE", "LOANPTRATE"]]
-
-    # # Read the data
-    # chunks = df(
-    #     header=0,
-    #     low_memory=False,
-    #     delimiter=',',
-    #     usecols=["LPRODAT", "LOANAMT", "LOANTYPE", "LNINTRATEPA", "LNEFFINTRATE",
-    #             "DGRANTED", "LOANPTRATE"],
-    #     chunksize=50000
-    # )
-
-    # Append all chunks
-    #df = pd.concat([chunk for chunk in chunks])
-    df = chunks
-
-    # Convert LPRODAT dtypes to datetime
-    df['LPRODAT'] = df['LPRODAT'].apply(
-        lambda x: pd.to_datetime(str(x), format='%d/%m/%Y'))
     # Rename columns
-    df.columns = ['date_loan', 'type', 'date_granted',
-                'term', 'amount', 'addon', 'nominal']
-
-    # Exlclude the rows with 0 amount and 0 date granted
+    df.columns = ['date_loan', 'amount', 'type', 'addon', 'nominal', 'date_granted', 'term']
+    
+    # Exclude the rows with 0 amount and 0 date granted
     df = df[df['amount'] != 0]
     df = df[df['date_granted'] != 0]
-
-    # Replace LPT048 with corresponding numeric term
-    df['term'] = df['term'].replace('LPT048', 48.0)
-    df['term'] = df['term'].replace('LPT030', 30.0)
-    df['term'] = df['term'].replace('LPT036', 36.0)
-    df['term'] = df['term'].replace('LPT060', 60.0)
-    df['term'] = df['term'].replace('LPT024', 24.0)
-    df['term'] = df['term'].replace('LPT012', 12.0)
-    df['term'] = df['term'].replace('LPT054', 54.0)
-    df['term'] = df['term'].replace('LPT042', 42.0)
-    df['term'] = df['term'].replace('LPT018', 18.0)
-
-
-    # Exclude whitespaces term
-    df = df[df['term'] != ' ']
-
+    df.dropna(inplace = True, subset = ['term'])
+    
     # Drop date granted column
     df.drop('date_granted', axis=1, inplace=True)
-
+    
     # Set date_loan as index
     df.set_index('date_loan', drop=True, inplace=True)
-
+    df.index = pd.to_datetime(df.index)
+    
     # New columns to be defined
     cols = ['type', 'term', 'addon', 'nominal']
-
+    
     # Create features
     df2 = create_features(df, label='amount', persist_cols=cols)
     df2.reset_index(drop=False, inplace=True)
     df2.sort_values(by='date_loan', inplace=True)
     df2.set_index('date_loan', inplace=True)
-
-    # Get only the 2010 onwards data
-    df2 = df2[(df2['year'] >= 2003)]
-
-    # Clean the data
+    
+    # Data Cleaning
     df3 = df2[['type', 'term', 'addon', 'amount']]
     df3['term'] = df3['term'].astype('float')
     df3.reset_index(inplace=True)
-
+    
     # Further pre-processing
     df4 = pd.DataFrame(df3.groupby(['date_loan', 'type', 'term', 'addon'])[
-                    'amount'].sum()).reset_index()
+                       'amount'].sum()).reset_index()
     df4['term'] = df4['term'].astype('str')
     df4['addon'] = df4['addon'].astype('str')
+    
+    # Counts and shares
     df4_counts = df4.set_index('date_loan')[
         'type'].str.get_dummies().sum(level=0)
     df4_dayshares = df4_counts.div(
         df4_counts.sum(axis=1), axis=0).mul(100).round(3)
-    df4_dayshares.columns = ['AL%', 'AP%', 'AS%', 'BL%']
+    
+    df4_dayshares_cols = df4_dayshares.columns.tolist()
+    df4_dayshares_newcols = [col + '%' for col in df4_dayshares_cols]
+    df4_dayshares.columns = df4_dayshares_newcols
+    
+    # Amounts
     df4_amounts = df4.groupby(['date_loan', 'type'])[
         'amount'].sum().reset_index()
     df4_amounts_new = df4_amounts.pivot(
         index='date_loan', columns='type', values='amount')
     df4_amounts_new = df4_amounts_new.reset_index().rename_axis(
         None, axis=1).set_index('date_loan')
+    
+    # Terms
     df4_terms = df4.set_index('date_loan')[
         'term'].str.get_dummies().sum(level=0)
     df4_termshares = df4_terms.div(
         df4_terms.sum(axis=1), axis=0).mul(100).round(2)
-    df4 = df4[(df4['addon'] != '156800.0')]
-    df4 = df4[(df4['addon'] != '35200.0')]
+    
+    # Addons
     df4_addons = df4.set_index('date_loan')[
         'addon'].str.get_dummies().sum(level=0)
     df4_addonhares = df4_addons.div(
         df4_addons.sum(axis=1), axis=0).mul(100).round(2)
+    
+    # Amounts Continuation
     df4_amounts_zeroes = df4_amounts_new.fillna(0)
     df4_amounts_zeroes['total'] = df4_amounts_zeroes.sum(axis=1)
+    
+    # Concatenation
     df_combined1 = pd.concat(
         [df4_dayshares, df4_termshares, df4_addonhares, df4_amounts_zeroes['total']], axis=1)
+    
+    df_combined1[df_combined1.columns.tolist()[:-1]] = df_combined1[df_combined1.columns.tolist()[:-1]].shift(35)
+    df_combined1['lag_35'] = df_combined1['total'].shift(35)
+    df_combined1.dropna(inplace=True)
 
+    df_combined1 = df_combined1.resample('D').sum()
+    df_combined1['date'] = df_combined1.index
+    df_combined1['dayofweek'] = df_combined1['date'].dt.dayofweek
+    df_combined1['quarter'] = df_combined1['date'].dt.quarter
+    df_combined1['month'] = df_combined1['date'].dt.month
+    df_combined1['dayofyear'] = df_combined1['date'].dt.dayofyear
+    df_combined1['dayofmonth'] = df_combined1['date'].dt.day
+    df_combined1['weekofyear'] = df_combined1['date'].dt.weekofyear
+    
     return df_combined1
 
-def training(data):
-
-    X = data.drop(['total', 'date'], axis=1)
-    y = data['total']
-    X_train = X.iloc[:len(data)-time]
-    X_test = X.iloc[len(data)-time:]
-    y_train = y.iloc[:len(data)-time]
-    y_test = y.iloc[len(data)-time:]
-
+# ==================================================================================================
+# Data Scaling
+# ==================================================================================================
+def scale_data(data, test_size=0.05):
+    
+    X = data.drop(['total'], axis=1)
+    y= data['total']
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=1,shuffle=False)
+       
     scaler = StandardScaler()
 
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
-
-    pca = PCA(n_components=0.85)
-    new_Xtrain = pca.fit_transform(X_train)
-    new_Xtest = pca.transform(X_test)
-
-    reg = xgb.XGBRegressor(
-        n_estimators=1500, objective='reg:squarederror', reg_alpha=0.5)
-    reg.fit(new_Xtrain, y_train, verbose=False)
-
     
-    return reg, new_Xtest, y_test
+    return X_train, X_test, y_train, y_test
 
-# def forecast(file_path, f, save_path):
-def forecast(df):
+# ==================================================================================================
+# Models
+# ==================================================================================================
+### XGBOOST
+def xgboost(X_train, X_test, y_train, y_test):
 
-    st.sidebar.subheader("Select Timeframe")
-    timeframe_select = st.sidebar.selectbox(
-        label="Select Timeframe",
-        options=['3 months', '6 months', '1 year', '2 years']
-    )
-
-    st.sidebar.subheader("Select Confidence Level")
-    confidence_level_select = st.sidebar.selectbox(
-        label="Select Confidence Level",
-        options=['90%', '95%', '99%']
-    )
+    # Model
+    xgboost = xgb.XGBRegressor(n_estimators=1500, objective='reg:squarederror', reg_alpha=0.5).fit(X_train,y_train)
+    pred = xgboost.predict(X_test)
     
-    global time, confidence_level
-
-    data = cleaning(df)
-
-    latest = data.index[-1:][0]
-
-    if timeframe_select == '3 months':
-        time = 90
-        tomorrow = data.index[-1:][0] + timedelta(days=1)
-        future = data.index[-1:][0] + timedelta(days=time)
+    #Cross validation
+    cv = KFold(n_splits=10, random_state=7,shuffle=True)
+    MAE = cross_val_score(xgboost, X_test, y_test, scoring='neg_mean_absolute_error', cv=cv)
+    RSME = cross_val_score(xgboost, X_test, y_test, scoring='neg_root_mean_squared_error', cv=cv)
+    R2 = cross_val_score(xgboost, X_test, y_test, scoring='r2', cv=cv)
     
-    if timeframe_select == '6 months':
-        time = 180
-        tomorrow = data.index[-1:][0] + timedelta(days=1)
-        future = data.index[-1:][0] + timedelta(days=time)
+    #Scores
+    scores = {'MEA':np.mean(MAE), 'RSME':np.mean(RSME), 'R2':np.mean(R2)}
+    df_scores = pd.DataFrame(scores, index=['xgboost'])
+    y_pred =pd.DataFrame(pred, columns=['xgboost'])
+
+    return xgboost, y_pred ,df_scores
     
-    if timeframe_select == '1 year':
-        time = 365
-        tomorrow = data.index[-1:][0] + timedelta(days=1)
-        future = data.index[-1:][0] + timedelta(days=time)
+### LINEAR REGRESSION
+def Linreg(X_train, X_test, y_train, y_test):
     
-    if timeframe_select == '2 years':
-        time = 730
-        tomorrow = data.index[-1:][0] + timedelta(days=1)
-        future = data.index[-1:][0] + timedelta(days=time)
+    Linreg = LinearRegression().fit(X_train,y_train)
+    pred = Linreg.predict(X_test)
+    
+    cv = KFold(n_splits=10, random_state=7,shuffle=True)
+    MAE = cross_val_score(Linreg, X_test, y_test, scoring='neg_mean_absolute_error', cv=cv)
+    RSME = cross_val_score(Linreg, X_test, y_test, scoring='neg_root_mean_squared_error', cv=cv)
+    R2 = cross_val_score(Linreg, X_test, y_test, scoring='r2', cv=cv)
+    
+    scores = {'MEA':np.mean(MAE), 'RSME':np.mean(RSME), 'R2':np.mean(R2)}
+    df_scores = pd.DataFrame(scores, index=['Linreg'])
+    y_pred = pd.DataFrame(pred, columns=['Linreg'])  
 
-    PH_BD = CustomBusinessDay(calendar=PHBusinessCalendar())
-    s = pd.date_range(tomorrow, end=future, freq=PH_BD)
-    dfs = pd.DataFrame(s, columns=['Date'])
-    futuredates = dfs['Date'].tolist()
-    cols = data.columns.tolist()
+    return Linreg, y_pred ,df_scores
 
-    df_future = pd.DataFrame(index=futuredates, columns=cols)
-    df_future.fillna(0, inplace=True)
-    df_future.index = pd.to_datetime(df_future.index)
+### RANDOM FOREST REGRESSOR
+def RFReg(X_train, X_test, y_train, y_test):
+    
+    RFReg = RandomForestRegressor(n_estimators=1000).fit(X_train,y_train)
+    pred = RFReg.predict(X_test)
+    
+    cv = KFold(n_splits=10, random_state=7,shuffle=True)
+    MAE = cross_val_score(RFReg, X_test, y_test, scoring='neg_mean_absolute_error', cv=cv)
+    RSME = cross_val_score(RFReg, X_test, y_test, scoring='neg_root_mean_squared_error', cv=cv)
+    R2 = cross_val_score(RFReg, X_test, y_test, scoring='r2', cv=cv)
+    
+    scores = {'MEA':np.mean(MAE), 'RSME':np.mean(RSME), 'R2':np.mean(R2)}
+    df_scores = pd.DataFrame(scores, index=['RandomForestReg'])
+    y_pred =pd.DataFrame(pred, columns=['RandomForestReg'])  
 
-    df_future2 = pd.concat([data, df_future])
-    df_future2[df_future2.columns.tolist(
-    )[:-1]] = df_future2[df_future2.columns.tolist()[:-1]].shift(35)
-    df_future2['lag_35'] = df_future2['total'].shift(35)
-    df_future2.dropna(inplace=True)
+    return RFReg, y_pred ,df_scores
 
-    df_future3 = df_future2.resample('D').sum()
-    df_future3['date'] = df_future3.index
-    df_future3['dayofweek'] = df_future3['date'].dt.dayofweek
-    df_future3['quarter'] = df_future3['date'].dt.quarter
-    df_future3['month'] = df_future3['date'].dt.month
-    df_future3['dayofyear'] = df_future3['date'].dt.dayofyear
-    df_future3['dayofmonth'] = df_future3['date'].dt.day
-    df_future3['weekofyear'] = df_future3['date'].dt.weekofyear
+### K-NEIGHBORS REGRESSOR
+def knn(X_train, X_test, y_train, y_test):
+    
+    knn = KNeighborsRegressor(n_neighbors=20,leaf_size=100).fit(X_train,y_train)
+    pred = knn.predict(X_test)
+    
+    cv = KFold(n_splits=10, random_state=7,shuffle=True)
+    MAE = cross_val_score(knn, X_test, y_test, scoring='neg_mean_absolute_error', cv=cv)
+    RSME = cross_val_score(knn, X_test, y_test, scoring='neg_root_mean_squared_error', cv=cv)
+    R2 = cross_val_score(knn, X_test, y_test, scoring='r2', cv=cv)
+    
+    scores = {'MEA':np.mean(MAE), 'RSME':np.mean(RSME), 'R2':np.mean(R2)}
+    df_scores = pd.DataFrame(scores, index=['KNeighborsReg'])
+    y_pred =pd.DataFrame(pred, columns=['KNeighborsReg'])  
 
-    model, X_test, y_test = training(df_future3)
-    y_pred = model.predict(X_test)
-    predictions = pd.DataFrame(y_test)
-    predictions.columns = ['Test']
-    predictions['Predicted'] = y_pred
-    predictions = predictions[predictions['Predicted'] > 0]
+    return knn, y_pred ,df_scores
 
-    res = predictions['Test'] - predictions['Predicted'] # added a residual computation
-    rmse = np.sqrt(mean_squared_error(predictions['Test'], predictions['Predicted']))
-    mae = mean_absolute_error(predictions['Test'], predictions['Predicted'])
-    r2score = r2_score(predictions['Test'], predictions['Predicted'])
+### DECISION TREE REGRESSOR
+def DTree(X_train, X_test, y_train, y_test):
+    
+    DTree = DecisionTreeRegressor(random_state=0).fit(X_train,y_train)
+    pred = DTree.predict(X_test)
+    
+    cv = KFold(n_splits=10, random_state=7,shuffle=True)
+    MAE = cross_val_score(DTree, X_test, y_test, scoring='neg_mean_absolute_error', cv=cv)
+    RSME = cross_val_score(DTree, X_test, y_test, scoring='neg_root_mean_squared_error', cv=cv)
+    R2 = cross_val_score(DTree, X_test, y_test, scoring='r2', cv=cv)
+    
+    scores = {'MEA':np.mean(MAE), 'RSME':np.mean(RSME), 'R2':np.mean(R2)}
+    df_scores = pd.DataFrame(scores, index=['DecisionTreeReg'])
+    y_pred =pd.DataFrame(pred, columns=['DecisionTreeReg'])  
 
-    predictions.drop('Test', axis=1, inplace=True)
+    return DTree, y_pred ,df_scores
 
-    alpha = 0.05
+### SUPPORT VECTOR MACHINE
+def SVMreg(X_train, X_test, y_train, y_test):
+    
+    SVMreg = SVR(kernel='rbf').fit(X_train,y_train)
+    pred = SVMreg.predict(X_test)
+    
+    cv = KFold(n_splits=10, random_state=7,shuffle=True)
+    MAE = cross_val_score(SVMreg, X_test, y_test, scoring='neg_mean_absolute_error', cv=cv)
+    RSME = cross_val_score(SVMreg, X_test, y_test, scoring='neg_root_mean_squared_error', cv=cv)
+    R2 = cross_val_score(SVMreg, X_test, y_test, scoring='r2', cv=cv)
+    
+    scores = {'MEA':np.mean(MAE), 'RSME':np.mean(RSME), 'R2':np.mean(R2)}
+    df_scores = pd.DataFrame(scores, index=['SupportVectorReg'])
+    y_pred =pd.DataFrame(pred, columns=['SupportVectorReg'])  
 
-    bootstrap = np.asarray([np.random.choice(res, size=res.shape) for _ in range(100)])
-    q_bootstrap = np.quantile(bootstrap, q=[alpha/2, 1-alpha/2], axis=0)
+    return SVMreg, y_pred ,df_scores
 
-    if confidence_level_select == "90%":
-        confidence_level = 1.645
+### LIGHT GBM
+def lgbmR(X_train, X_test, y_train, y_test):
+    
+    lgbmR = LGBMRegressor().fit(X_train,y_train)
+    pred = lgbmR.predict(X_test)
+    
+    cv = KFold(n_splits=10, random_state=7,shuffle=True)
+    MAE = cross_val_score(lgbmR, X_test, y_test, scoring='neg_mean_absolute_error', cv=cv)
+    RSME = cross_val_score(lgbmR, X_test, y_test, scoring='neg_root_mean_squared_error', cv=cv)
+    R2 = cross_val_score(lgbmR, X_test, y_test, scoring='r2', cv=cv)
+    
+    scores = {'MEA':np.mean(MAE), 'RSME':np.mean(RSME), 'R2':np.mean(R2)}
+    df_scores = pd.DataFrame(scores, index=['LGBMRegressor'])
+    y_pred =pd.DataFrame(pred, columns=['LGBMRegressor'])  
 
-    if confidence_level_select == "95%":
-        confidence_level = 1.96
+    return lgbmR, y_pred ,df_scores
 
-    if confidence_level_select == "99%":
-        confidence_level = 2.576
+### MULTI-LAYER PERCEPTRON REG
+def MLPreg(X_train, X_test, y_train, y_test):
+    
+    MLPreg = MLPRegressor(random_state=1, max_iter=1500).fit(X_train,y_train)
+    pred = MLPreg.predict(X_test)
+    
+    cv = KFold(n_splits=10, random_state=7,shuffle=True)
+    MAE = cross_val_score(MLPreg, X_test, y_test, scoring='neg_mean_absolute_error', cv=cv)
+    RSME = cross_val_score(MLPreg, X_test, y_test, scoring='neg_root_mean_squared_error', cv=cv)
+    R2 = cross_val_score(MLPreg, X_test, y_test, scoring='r2', cv=cv)
+    
+    scores = {'MEA':np.mean(MAE), 'RSME':np.mean(RSME), 'R2':np.mean(R2)}
+    df_scores = pd.DataFrame(scores, index=['MLPRegressor'])
+    y_pred =pd.DataFrame(pred, columns=['MLPRegressor'])  
 
-    res_std = res.std() 
-    y_upper = predictions['Predicted'] + (confidence_level * res_std)
-    y_lower = predictions['Predicted'] - (confidence_level * res_std)
+    return MLPreg, y_pred ,df_scores
+
+### VOTING ENSEMBLE
+def voting_ensemble(X_train, X_test, y_train, y_test):
+    
+    # create the sub models
+    voting_estimators = []
+
+    # model 1
+    Linreg = LinearRegression()
+    voting_estimators.append(('LinearRegression', Linreg))
+    # model 2
+    knn = KNeighborsRegressor(n_neighbors=20,leaf_size=100)
+    voting_estimators.append(('KNeighborsRegressor', knn))
+    # model 3
+    dtree = DecisionTreeRegressor(random_state=0)
+    voting_estimators.append(('DecisionTreeRegressor', dtree))
+    # model 4
+    svmR = SVR(kernel='rbf')
+    voting_estimators.append(('SVMRegressor', svmR))
+    # model 5
+    xgboost = xgb.XGBRegressor(n_estimators=1500, objective='reg:squarederror', reg_alpha=0.5)
+    voting_estimators.append(('XGBRegressor', xgboost))
+    #model 6
+    lgbmR = LGBMRegressor()
+    voting_estimators.append(('LGBMRegressor', lgbmR))
+    #model 7
+    rfreg = RandomForestRegressor(n_estimators=1000)
+    voting_estimators.append(('RandomForestRegressor', rfreg))
+    #model 8
+    MLPreg = MLPRegressor(random_state=1, max_iter=1500)
+    voting_estimators.append(('MLPRegressor', MLPreg))
+    
+    # create the ensemble model
+    voting_ensemble = VotingRegressor(voting_estimators).fit(X_train, y_train)
+    pred = voting_ensemble.predict(X_test)
+    
+    cv = KFold(n_splits=10, random_state=7,shuffle=True)
+    MAE = cross_val_score(voting_ensemble, X_test, y_test, scoring='neg_mean_absolute_error', cv=cv)
+    RSME = cross_val_score(voting_ensemble, X_test, y_test, scoring='neg_root_mean_squared_error', cv=cv)
+    R2 = cross_val_score(voting_ensemble, X_test, y_test, scoring='r2', cv=cv)
+    
+    scores = {'MEA':np.mean(MAE), 'RSME':np.mean(RSME), 'R2':np.mean(R2)}
+    df_scores = pd.DataFrame(scores, index=['voting_ensemble'])
+    y_pred =pd.DataFrame(pred, columns=['voting_ensemble'])  
+
+    return voting_ensemble, y_pred ,df_scores
+
+### STACKING ENSEMBLE
+def stacking_ensemble(X_train, X_test, y_train, y_test):
+    
+    # create the sub models
+    stacking_estimators_initial = []
+
+    #Base Estimator
+    # model 1
+    Linreg = LinearRegression()
+    stacking_estimators_initial.append(('LinearRegression', Linreg))
+    # model 2
+    knn = KNeighborsRegressor(n_neighbors=20,leaf_size=100)
+    stacking_estimators_initial.append(('KNeighborsRegressor', knn))
+    # model 3
+    dtree = DecisionTreeRegressor(random_state=0)
+    stacking_estimators_initial.append(('DecisionTreeRegressor', dtree))
+    # model 4
+    svmR = SVR(kernel='rbf')
+    stacking_estimators_initial.append(('SVMRegressor', svmR))
+    # model 5
+    xgboost = xgb.XGBRegressor(n_estimators=1500, objective='reg:squarederror', reg_alpha=0.5)
+    stacking_estimators_initial.append(('XGBRegressor', xgboost))
+    #model 6
+    lgbmR = LGBMRegressor()
+    stacking_estimators_initial.append(('LGBMRegressor', lgbmR))
+    #model 7
+    rfreg = RandomForestRegressor(n_estimators=1000)
+    stacking_estimators_initial.append(('RandomForestRegressor', rfreg))
+    #model 8
+    MLPreg = MLPRegressor(random_state=1, max_iter=1500)
+    stacking_estimators_initial.append(('MLPRegressor', MLPreg))
+
+    #Final/Generalize Estimator
+    stacking_estimators_final = LinearRegression()
+    
+    stacking_ensemble = StackingRegressor(estimators=stacking_estimators_initial, 
+                          final_estimator=stacking_estimators_final, cv=5).fit(X_train,y_train)
+    pred = stacking_ensemble.predict(X_test)
+    
+    cv = KFold(n_splits=10, random_state=7,shuffle=True)
+    MAE = cross_val_score(stacking_ensemble, X_test, y_test, scoring='neg_mean_absolute_error', cv=cv)
+    RSME = cross_val_score(stacking_ensemble, X_test, y_test, scoring='neg_root_mean_squared_error', cv=cv)
+    R2 = cross_val_score(stacking_ensemble, X_test, y_test, scoring='r2', cv=cv)
+    
+    scores = {'MEA':np.mean(MAE), 'RSME':np.mean(RSME), 'R2':np.mean(R2)}
+    df_scores = pd.DataFrame(scores, index=['stacking_ensemble'])
+    y_pred =pd.DataFrame(pred, columns=['stacking_ensemble'])  
+
+    return stacking_ensemble, y_pred ,df_scores
+
+# ==================================================================================================
+# All Models
+# ==================================================================================================
+def all_models(X_train, X_test, y_train, y_test):
+    xgboost_model, xgboost_pred, xgboost_scores    =  xgboost(X_train, X_test, y_train, y_test)
+    Linreg_model, Linreg_pred, Linreg_scores       =  Linreg(X_train, X_test, y_train, y_test)
+    RFReg_model, RFReg_pred, RFReg_scores          =  RFReg(X_train, X_test, y_train, y_test)
+    knn_model, knn_pred, knn_scores                =  knn(X_train, X_test, y_train, y_test)
+    DTree_model, DTree_pred, DTree_scores          =  DTree(X_train, X_test, y_train, y_test)
+    SVMreg_model, SVMreg_pred, SVMreg_scores       =  SVMreg(X_train, X_test, y_train, y_test)
+    lgbmR_model, lgbmR_pred, lgbmR_scores          =  lgbmR(X_train, X_test, y_train, y_test)
+    MLPreg_model, MLPreg_pred, MLPreg_scores       =  MLPreg(X_train, X_test, y_train, y_test)
+    voting_model, voting_pred, voting_scores       =  voting_ensemble(X_train, X_test, y_train, y_test)
+    stacking_model, stacking_pred, stacking_scores =  stacking_ensemble(X_train, X_test, y_train, y_test)
+    
+    #Predictions
+    y_pred_list = [xgboost_pred, Linreg_pred, RFReg_pred, knn_pred, DTree_pred, SVMreg_pred, lgbmR_pred, MLPreg_pred,
+                   voting_pred, stacking_pred]
+
+    y_pred = pd.concat(y_pred_list, axis=1)
+    
+    #y_test
+    predictions= pd.DataFrame(y_test)
+    predictions = predictions.reset_index()
+    predictions.columns = ['date_loan','Test']
+    
+    #Scores
+    scores_list = [xgboost_scores, Linreg_scores, RFReg_scores, knn_scores, DTree_scores, SVMreg_scores, lgbmR_scores, MLPreg_scores,
+                   voting_scores, stacking_scores]
+
+    df_scores = pd.concat(scores_list, axis=0).sort_values(by=['R2'], ascending=False)
+    best_scores = pd.DataFrame(df_scores.iloc[0])
+    col = best_scores.columns
+    
+    #Plot
+    predictions['Predicted'] = y_pred[col]
+    st.line_chart(predictions['Test'].tail(30)) #.plot(legend=True, marker='o'))#,markersize=0.5)
+    st.line_chart(predictions['Predicted'].tail(30)) #.plot(legend=True, marker='o'))
+
+    # plt.title('Best Model Score')
+    # plt.show();
+    # print(best_scores)
+    
+    return df_scores, best_scores
+  
+# ==================================================================================================
+# Forecast
+# ==================================================================================================
+#Create the bar graph that compares the accuracy of each models
+def createFig(values):
+    modelDf = pd.Series(values, name='Accuracy Score')
+    modelDf.index.name = 'Model'
+    modelDf.reset_index()
+    fig1 = px.bar(modelDf, x=modelDf.index, y=modelDf.name)
+    st.write(fig1)
+
+def forecast(data):
+    df = cleaning(data)
+    df2 = df.resample('D').sum()
+    X_train, X_test, y_train, y_test = scale_data(df2, test_size=0.05)
+
+    st.header('Predictions')
+    df_scores, best_scores = all_models(X_train, X_test, y_train, y_test)
+
+    st.header('Model Performance Comparison')
+    st.write(df_scores)
+    createFig(df_scores)
+
+    st.header('Best Scores')
+    st.write(best_scores)
+
+#    st.sidebar.subheader("Select Timeframe")
+#    timeframe_select = st.sidebar.selectbox(
+#        label="Select Timeframe",
+#        options=['3 months', '6 months', '1 year', '2 years']
+#    )
+
+#    st.sidebar.subheader("Select Confidence Level")
+#    confidence_level_select = st.sidebar.selectbox(
+#        label="Select Confidence Level",
+#        options=['90%', '95%', '99%']
+#    )
+    
+#    global time, confidence_level
+
+#    data = cleaning(df)
+
+#    latest = data.index[-1:][0]
+
+#    if timeframe_select == '3 months':
+#        time = 90
+#        tomorrow = data.index[-1:][0] + timedelta(days=1)
+#        future = data.index[-1:][0] + timedelta(days=time)
+    
+#    if timeframe_select == '6 months':
+#        time = 180
+#        tomorrow = data.index[-1:][0] + timedelta(days=1)
+#        future = data.index[-1:][0] + timedelta(days=time)
+    
+#    if timeframe_select == '1 year':
+#        time = 365
+#        tomorrow = data.index[-1:][0] + timedelta(days=1)
+#        future = data.index[-1:][0] + timedelta(days=time)
+    
+#    if timeframe_select == '2 years':
+#        time = 730
+#        tomorrow = data.index[-1:][0] + timedelta(days=1)
+#        future = data.index[-1:][0] + timedelta(days=time)
+
+#    PH_BD = CustomBusinessDay(calendar=PHBusinessCalendar())
+#    s = pd.date_range(tomorrow, end=future, freq=PH_BD)
+#    dfs = pd.DataFrame(s, columns=['Date'])
+#    futuredates = dfs['Date'].tolist()
+#    cols = data.columns.tolist()
+
+#    df_future = pd.DataFrame(index=futuredates, columns=cols)
+#    df_future.fillna(0, inplace=True)
+#    df_future.index = pd.to_datetime(df_future.index)
+
+#    df_future2 = pd.concat([data, df_future])
+#    df_future2[df_future2.columns.tolist(
+#    )[:-1]] = df_future2[df_future2.columns.tolist()[:-1]].shift(35)
+#    df_future2['lag_35'] = df_future2['total'].shift(35)
+#    df_future2.dropna(inplace=True)
+
+#    df_future3 = df_future2.resample('D').sum()
+#    df_future3['date'] = df_future3.index
+#    df_future3['dayofweek'] = df_future3['date'].dt.dayofweek
+#    df_future3['quarter'] = df_future3['date'].dt.quarter
+#    df_future3['month'] = df_future3['date'].dt.month
+#    df_future3['dayofyear'] = df_future3['date'].dt.dayofyear
+#    df_future3['dayofmonth'] = df_future3['date'].dt.day
+#    df_future3['weekofyear'] = df_future3['date'].dt.weekofyear
+
+#    model, X_test, y_test = training(df_future3)
+#    y_pred = model.predict(X_test)
+#    predictions = pd.DataFrame(y_test)
+#    predictions.columns = ['Test']
+#    predictions['Predicted'] = y_pred
+#    predictions = predictions[predictions['Predicted'] > 0]
+
+#    res = predictions['Test'] - predictions['Predicted'] # added a residual computation
+#    rmse = np.sqrt(mean_squared_error(predictions['Test'], predictions['Predicted']))
+#    mae = mean_absolute_error(predictions['Test'], predictions['Predicted'])
+#    r2score = r2_score(predictions['Test'], predictions['Predicted'])
+
+#    predictions.drop('Test', axis=1, inplace=True)
+
+#    alpha = 0.05
+
+#    bootstrap = np.asarray([np.random.choice(res, size=res.shape) for _ in range(100)])
+#    q_bootstrap = np.quantile(bootstrap, q=[alpha/2, 1-alpha/2], axis=0)
+
+#    if confidence_level_select == "90%":
+#        confidence_level = 1.645
+
+#    if confidence_level_select == "95%":
+#        confidence_level = 1.96
+
+#    if confidence_level_select == "99%":
+#        confidence_level = 2.576
+
+#    res_std = res.std() 
+#    y_upper = predictions['Predicted'] + (confidence_level * res_std)
+#    y_lower = predictions['Predicted'] - (confidence_level * res_std)
 
     #y_pred = pd.Series(model.predict(X_test), index=X_test.index)
     # y_lower = predictions['Predicted'] + q_bootstrap[0].mean()
@@ -344,22 +632,22 @@ def forecast(df):
     #predictions.to_csv('output/prediction.csv', index = False)
     #predictions.to_csv(os.path.join(save_path, 'prediction.csv'))
 
-    fig, ax = plt.subplots()
-    ax.plot(predictions, marker='o')
-    ax.fill_between(predictions.index, y_lower, y_upper, alpha=0.3)
-    ax.set_title('Time Series Forecast') 
-    plt.rcParams["xtick.labelsize"] = 5
+#    fig, ax = plt.subplots()
+#    ax.plot(predictions, marker='o')
+#    ax.fill_between(predictions.index, y_lower, y_upper, alpha=0.3)
+#    ax.set_title('Time Series Forecast')
+#    plt.rcParams["xtick.labelsize"] = 5
     # plt.rcParams["figure.figsize"] = (8, 4)
-    st.pyplot(fig)
+#    st.pyplot(fig)
 
-    st.header("Accuracy Metrics")
-    st.write("RMSE:", rmse)
-    st.write("MAE:", mae)
-    st.write("R2:", r2score)
+#    st.header("Accuracy Metrics")
+#    st.write("RMSE:", rmse)
+#    st.write("MAE:", mae)
+#    st.write("R2:", r2score)
 
-    st.header("Prediction Values")
-    st.dataframe(predictions)
-    st.header("Predicted Upper Values")
-    st.write(y_upper)
-    st.header("Predicted Lower Values")
-    st.write(y_lower)
+#    st.header("Prediction Values")
+#    st.dataframe(predictions)
+#    st.header("Predicted Upper Values")
+#    st.write(y_upper)
+#    st.header("Predicted Lower Values")
+#    st.write(y_lower)
