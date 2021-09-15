@@ -105,11 +105,11 @@ def translate_to_eng(paragraph):
 
     for sentence in paragraph:
         try:
-            sleep(1.0)
+            # sleep(1.0)
             sentence = sentence.strip()
             en_blob = Translator()
             translated.append(str(en_blob.translate(sentence, from_lang='tl', to_lang='en')))
-            sleep(1.0)
+            # sleep(1.0)
         except Exception as e:
             print(e)
 
@@ -177,6 +177,8 @@ def perform_sentimental_analysis(df):
 def process_data(df):
     st.title("Sentiment Analysis")
 
+    # df = df.drop_duplicates(subset='tweet', keep='last')
+
     try:
         st.sidebar.subheader("Data Sentiment Analysis")
         comment_columns = st.sidebar.multiselect(
@@ -225,6 +227,8 @@ def open_sentimental_analysis_page():
 
         if keywords:
             tweets = get_tweets(keywords)
+            tweets = tweets.drop_duplicates(subset='tweet', keep='last')
+            # print(type(tweets))
             print(f"Tweets: {tweets}")
             st.write(tweets.head(15))
             process_data(tweets)
