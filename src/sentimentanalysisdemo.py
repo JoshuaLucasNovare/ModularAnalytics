@@ -16,6 +16,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # from translator import Translator
+from google.cloud import translate_v2 as translate
 from .twitter.twitter_search import get_tweets
 from textblob.translate import Translator
 from textblob import TextBlob
@@ -39,25 +40,29 @@ pipeline = joblib.load(f'{src}/{models_dir}/{model}')
 vectorizer = joblib.load(f'{src}/{models_dir}/vectorizer.pkl')
 
 
-def translate_to_eng(paragraph):
-    paragraph = str(paragraph).strip().split('.')
-    translated = []
+def translate_to_eng(text):
+    """Translates text into the target language.
+    
+    Target must be an ISO 639-1 language code.
+    See https://g.co/cloud/translate/v2/translate-reference#supported_languages
+    """
+    import six
+    from google.cloud import translate_v2 as translate
 
-    for sentence in paragraph:
-        try:
-            time.sleep(1.0)
-            sentence = sentence.strip()
-            print(f'Sentence: {sentence}')
-            en_blob = Translator()
-            translated.append(str(en_blob.translate(sentence, from_lang='tl', to_lang='en')))
-            # en_blob = TextBlob(sentence)
-            # translated.append(en_blob.translate(from_lang='tl', to='en'))
-            time.sleep(1.0)
-        except Exception as e:
-            translated.append(sentence)
-            print(f'[TRANSLATION ERROR] {e}')
+    translate_client = translate.Client()
 
-    return translated
+    if isinstance(text, six.binary_type):
+        text = text.decode("utf-8")
+    
+    # Text can also be a sequence of strings, in which case this method
+    # will return a sequence of results
+    result = translate_client.translate(text, target_language='en')
+
+    # print(f"Text: {result['input']}")
+    # print(f"Translation: {type(result['translatedText'])}")
+    # print(f"Detected source language: {result['detectedSourceLanguage']}")
+
+    return result['translatedText']
 
 
 def stop_remover(x, stop_list):
