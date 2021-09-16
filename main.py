@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from src.eda import show_eda
 from src.machinelearning import show_machinelearning_analysis
 from src.sentimentalanalysis import open_sentimental_analysis_page, process_data
-from src.sentimentanalysisdemo import open_demo_sentimental_analysis_page
+from src.sentimentanalysisdemo import tw_search
 from src.sentimentanalysisdemo import run_demo
 from src import design as design
 
@@ -100,6 +100,6 @@ if DA_select == 'Sentiment Analysis Demo':
     try:
         run_demo(df) 
     except Exception as e:
-        open_demo_sentimental_analysis_page()
+        tw_search()
 
 design.showFooter()

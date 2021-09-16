@@ -5,10 +5,6 @@ from decouple import config
 from .utils import get_language, remove_enter, translate_to_eng
 
 def tw_oauth():
-    # consumer_key = config('consumerKey')
-    # consumer_secret = config('consumerSecret')
-    # access_token = config('accessToken')
-    # access_token_secret = config('accessTokenSecret')
 
     consumer_key = os.environ['CONSUMER_KEY']
     consumer_secret = os.environ['CONSUMER_SECRET']

@@ -3,6 +3,7 @@ import os
 import findspark
 findspark.init(os.environ['SPARK_HOME'])
 import joblib
+import tweepy
 import time
 import re
 import logging
@@ -16,8 +17,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # from translator import Translator
+from .twitter.utils import get_language, remove_enter, translate_to_eng
 from google.cloud import translate_v2 as translate
-from .twitter.twitter_search import get_tweets
+from .twitter.twitter_search import get_tweets, tw_oauth
 from textblob.translate import Translator
 from textblob import TextBlob
 from time import sleep
@@ -40,31 +42,6 @@ pipeline = joblib.load(f'{src}/{models_dir}/{model}')
 vectorizer = joblib.load(f'{src}/{models_dir}/vectorizer.pkl')
 
 
-def translate_to_eng(text):
-    """Translates text into the target language.
-    
-    Target must be an ISO 639-1 language code.
-    See https://g.co/cloud/translate/v2/translate-reference#supported_languages
-    """
-    import six
-    from google.cloud import translate_v2 as translate
-
-    translate_client = translate.Client()
-
-    if isinstance(text, six.binary_type):
-        text = text.decode("utf-8")
-    
-    # Text can also be a sequence of strings, in which case this method
-    # will return a sequence of results
-    result = translate_client.translate(text, target_language='en')
-
-    # print(f"Text: {result['input']}")
-    # print(f"Translation: {type(result['translatedText'])}")
-    # print(f"Detected source language: {result['detectedSourceLanguage']}")
-
-    return result['translatedText']
-
-
 def stop_remover(x, stop_list):
     lst = []
     for i in x:
@@ -85,6 +62,7 @@ def run_demo(df):
         print(f'Feedback column: {feedback_column}\ttype: {type(feedback_column)}')
         
         if st.sidebar.button("Process Data"):
+            df['translated'] = ''
             df['sentiment'] = ''
             feedbacks = df[feedback_column].values
             f = st.empty()
@@ -103,6 +81,7 @@ def run_demo(df):
                 f.markdown('')
                 t.markdown('')
                 s.markdown('')
+                df.at[index, 'translated'] = translated
                 df.at[index, 'sentiment'] = sentiment
                 time.sleep(1.0)
             st.dataframe(data=df)
@@ -118,6 +97,7 @@ def run_demo(df):
             df[feedback_column] = df['word_tokenized'].apply(lambda x: stop_remover(x, stop_list))
             df[feedback_column] = df[feedback_column].apply(lambda x: ' '.join(x))
             df = df.drop(['word_tokenized'], axis=1)
+            df.to_csv(f'SentimentAnalysis_{datetime.today()}.csv')
 
             show_wordcloud(df)
     except Exception as e:
@@ -151,19 +131,56 @@ def show_wordcloud(df):
         print(f'Exception: {e}')
 
 
-def open_demo_sentimental_analysis_page():
+def tw_search():
     try:
         st.sidebar.subheader("Twitter Search")
         keywords = st.sidebar.text_input("Keyword")
+        api = tw_oauth()
+
+        tweet_list = {
+            'source': [],
+            'tweet': [],
+            'date_posted': [],
+            'translated': [],
+            'sentiment': []
+        }
+
+        f = st.empty()
+        t = st.empty()
+        s = st.empty()
 
         if keywords:
-            tweets = get_tweets(keywords)
-            tweets = tweets.drop_duplicates(subset='tweet', keep='last')
-            # print(type(tweets))
-            print(f"Tweets: {tweets}")
-            st.write(tweets)
-            tweets.to_csv(f'LandbankTwitter{datetime.today()}.csv', index=False)
-            run_demo(tweets)
+            tweets = tweepy.Cursor(api.search, q=keywords)
+
+            for tweet in tweets.items():
+                row = remove_enter(tweet.text)
+
+                if row not in tweet_list['tweet']:
+                    f.markdown(f'Tweet: {row}')
+                    time.sleep(2.0)
+
+                    translated = translate_to_eng(row)
+                    t.markdown(f'English Transation: {translated}')
+                    time.sleep(2.0)
+
+                    vect = vectorizer.transform(translated)
+                    sentiment = pipeline.predict(vect)[0]
+                    s.markdown(f'Sentiment: {sentiment}')
+
+                    time.sleep(3.0)
+                    f.markdown('')
+                    t.markdown('')
+                    s.markdown('')
+
+                    tweet_list['source'].append('Twitter')
+                    tweet_list['tweet'].append(row)
+                    tweet_list['date_posted'].append(tweet.created_at)
+                    tweet_list['translated'].append(translated)
+                    tweet_list['sentiment'].append(sentiment)
+
+
+            tweet_df = pd.DataFrame(tweet_list)
+            tweet_df.to_csv(f'LandbankTwitter{datetime.today()}.csv', index=False)
     except Exception as e:
         print(f"Error Except: {e}")
 
