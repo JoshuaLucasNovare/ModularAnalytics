@@ -493,14 +493,17 @@ def all_models(X_train, X_test, y_train, y_test):
     
     #Plot
     predictions['Predicted'] = y_pred[col]
-    st.line_chart(predictions['Test'].tail(30)) #.plot(legend=True, marker='o'))#,markersize=0.5)
-    st.line_chart(predictions['Predicted'].tail(30)) #.plot(legend=True, marker='o'))
-
-    # plt.title('Best Model Score')
-    # plt.show();
-    # print(best_scores)
+    test_data = predictions['Test'].tail(30)
+    pred_data = predictions['Predicted'].tail(30)
     
-    return df_scores, best_scores
+    res = test_data - pred_data
+    res_std = res.std() 
+    y_upper = pred_data + (1.96 * res_std)
+    y_lower = pred_data - (1.96 * res_std)
+    # 1.96 is an arbitrary number based on 95% CI
+    # Source: https://otexts.com/fpp2/prediction-intervals.html
+    
+    return df_scores, best_scores, col, pred_data, test_data, y_lower, y_upper
   
 # ==================================================================================================
 # Forecast
@@ -515,36 +518,49 @@ def createFig(values):
 
 def forecast(data):
     df = cleaning(data)
+
     df2 = df.resample('D').sum()
     X_train, X_test, y_train, y_test = scale_data(df2, test_size=0.05)
 
     st.header('Predictions')
-    df_scores, best_scores = all_models(X_train, X_test, y_train, y_test)
+    df_scores, best_scores, best_model, pred_data, test_data, y_lower, y_upper = all_models(X_train, X_test, y_train, y_test)
 
     st.header('Model Performance Comparison')
     st.write(df_scores)
-    createFig(df_scores)
+    createFig(df_scores[df_scores['R2'] > 0]['R2'])
 
-    st.header('Best Scores')
+    st.header('Best Model Performance')
+    #st.subheader(best_model.iloc[0:0])
     st.write(best_scores)
 
+    fig, ax = plt.subplots()
+    ax.plot(pred_data, color='blue', marker='o', label='Predicted')
+    ax.plot(test_data, color='orange', marker='o', label='Test')
+    ax.set_title('Time Series Forecast - Predicted vs Test')
+    #plt.rcParams["xtick.labelsize"] = 5
+    plt.rcParams["figure.figsize"] = (8, 4)
+    st.pyplot(fig)
+
+    fig, ax = plt.subplots()
+    ax.plot(pred_data, color='blue', marker='o', label='Predicted')
+    ax.fill_between(pred_data.index, y_lower, y_upper, alpha=0.3)
+    ax.set_title('Time Series Forecast with Prediction Intervals')
+    #plt.rcParams["xtick.labelsize"] = 5
+    plt.rcParams["figure.figsize"] = (8, 4)
+    st.pyplot(fig)
+
+
+### Streamlit version of line graphs (1 chart for test, 1 chart for pred)
+    #st.line_chart(test_data)
+    #st.line_chart(pred_data)
+
+
+### For selecting timeframe of predictions
 #    st.sidebar.subheader("Select Timeframe")
 #    timeframe_select = st.sidebar.selectbox(
 #        label="Select Timeframe",
 #        options=['3 months', '6 months', '1 year', '2 years']
 #    )
-
-#    st.sidebar.subheader("Select Confidence Level")
-#    confidence_level_select = st.sidebar.selectbox(
-#        label="Select Confidence Level",
-#        options=['90%', '95%', '99%']
-#    )
-    
-#    global time, confidence_level
-
-#    data = cleaning(df)
-
-#    latest = data.index[-1:][0]
 
 #    if timeframe_select == '3 months':
 #        time = 90
@@ -566,47 +582,17 @@ def forecast(data):
 #        tomorrow = data.index[-1:][0] + timedelta(days=1)
 #        future = data.index[-1:][0] + timedelta(days=time)
 
-#    PH_BD = CustomBusinessDay(calendar=PHBusinessCalendar())
-#    s = pd.date_range(tomorrow, end=future, freq=PH_BD)
-#    dfs = pd.DataFrame(s, columns=['Date'])
-#    futuredates = dfs['Date'].tolist()
-#    cols = data.columns.tolist()
 
-#    df_future = pd.DataFrame(index=futuredates, columns=cols)
-#    df_future.fillna(0, inplace=True)
-#    df_future.index = pd.to_datetime(df_future.index)
+### For selecting confidence level
+#    st.sidebar.subheader("Select Confidence Level")
+#    confidence_level_select = st.sidebar.selectbox(
+#        label="Select Confidence Level",
+#        options=['90%', '95%', '99%']
+#    )
 
-#    df_future2 = pd.concat([data, df_future])
-#    df_future2[df_future2.columns.tolist(
-#    )[:-1]] = df_future2[df_future2.columns.tolist()[:-1]].shift(35)
-#    df_future2['lag_35'] = df_future2['total'].shift(35)
-#    df_future2.dropna(inplace=True)
 
-#    df_future3 = df_future2.resample('D').sum()
-#    df_future3['date'] = df_future3.index
-#    df_future3['dayofweek'] = df_future3['date'].dt.dayofweek
-#    df_future3['quarter'] = df_future3['date'].dt.quarter
-#    df_future3['month'] = df_future3['date'].dt.month
-#    df_future3['dayofyear'] = df_future3['date'].dt.dayofyear
-#    df_future3['dayofmonth'] = df_future3['date'].dt.day
-#    df_future3['weekofyear'] = df_future3['date'].dt.weekofyear
-
-#    model, X_test, y_test = training(df_future3)
-#    y_pred = model.predict(X_test)
-#    predictions = pd.DataFrame(y_test)
-#    predictions.columns = ['Test']
-#    predictions['Predicted'] = y_pred
-#    predictions = predictions[predictions['Predicted'] > 0]
-
-#    res = predictions['Test'] - predictions['Predicted'] # added a residual computation
-#    rmse = np.sqrt(mean_squared_error(predictions['Test'], predictions['Predicted']))
-#    mae = mean_absolute_error(predictions['Test'], predictions['Predicted'])
-#    r2score = r2_score(predictions['Test'], predictions['Predicted'])
-
-#    predictions.drop('Test', axis=1, inplace=True)
-
+### For computing prediction intervals using dynamic multiplier
 #    alpha = 0.05
-
 #    bootstrap = np.asarray([np.random.choice(res, size=res.shape) for _ in range(100)])
 #    q_bootstrap = np.quantile(bootstrap, q=[alpha/2, 1-alpha/2], axis=0)
 
@@ -619,32 +605,8 @@ def forecast(data):
 #    if confidence_level_select == "99%":
 #        confidence_level = 2.576
 
-#    res_std = res.std() 
-#    y_upper = predictions['Predicted'] + (confidence_level * res_std)
-#    y_lower = predictions['Predicted'] - (confidence_level * res_std)
 
-    #y_pred = pd.Series(model.predict(X_test), index=X_test.index)
-    # y_lower = predictions['Predicted'] + q_bootstrap[0].mean()
-    # y_upper = predictions['Predicted'] + q_bootstrap[1].mean()
-
-    # predictions['Predicted'].plot(legend=True, marker='o')
-
-    #predictions.to_csv('output/prediction.csv', index = False)
-    #predictions.to_csv(os.path.join(save_path, 'prediction.csv'))
-
-#    fig, ax = plt.subplots()
-#    ax.plot(predictions, marker='o')
-#    ax.fill_between(predictions.index, y_lower, y_upper, alpha=0.3)
-#    ax.set_title('Time Series Forecast')
-#    plt.rcParams["xtick.labelsize"] = 5
-    # plt.rcParams["figure.figsize"] = (8, 4)
-#    st.pyplot(fig)
-
-#    st.header("Accuracy Metrics")
-#    st.write("RMSE:", rmse)
-#    st.write("MAE:", mae)
-#    st.write("R2:", r2score)
-
+### For outputting dfs of prediction, upper and lower values
 #    st.header("Prediction Values")
 #    st.dataframe(predictions)
 #    st.header("Predicted Upper Values")
