@@ -460,21 +460,57 @@ def stacking_ensemble(X_train, X_test, y_train, y_test):
 # ==================================================================================================
 # All Models
 # ==================================================================================================
-def all_models(X_train, X_test, y_train, y_test):
-    xgboost_model, xgboost_pred, xgboost_scores    =  xgboost(X_train, X_test, y_train, y_test)
-    Linreg_model, Linreg_pred, Linreg_scores       =  Linreg(X_train, X_test, y_train, y_test)
-    RFReg_model, RFReg_pred, RFReg_scores          =  RFReg(X_train, X_test, y_train, y_test)
-    knn_model, knn_pred, knn_scores                =  knn(X_train, X_test, y_train, y_test)
-    DTree_model, DTree_pred, DTree_scores          =  DTree(X_train, X_test, y_train, y_test)
-    SVMreg_model, SVMreg_pred, SVMreg_scores       =  SVMreg(X_train, X_test, y_train, y_test)
-    lgbmR_model, lgbmR_pred, lgbmR_scores          =  lgbmR(X_train, X_test, y_train, y_test)
-    MLPreg_model, MLPreg_pred, MLPreg_scores       =  MLPreg(X_train, X_test, y_train, y_test)
-    voting_model, voting_pred, voting_scores       =  voting_ensemble(X_train, X_test, y_train, y_test)
-    stacking_model, stacking_pred, stacking_scores =  stacking_ensemble(X_train, X_test, y_train, y_test)
-    
+def all_models(model_select, X_train, X_test, y_train, y_test):
+    y_pred_list = []
+    scores_list = []
+
+    for m in model_select:
+        if m == 'XGBoost':
+            xgboost_model, xgboost_pred, xgboost_scores    =  xgboost(X_train, X_test, y_train, y_test)
+            y_pred_list.append(xgboost_pred)
+            scores_list.append(xgboost_scores)
+        elif m == 'Linear Regression':
+            Linreg_model, Linreg_pred, Linreg_scores       =  Linreg(X_train, X_test, y_train, y_test)
+            y_pred_list.append(xgboost_pred)
+            scores_list.append(Linreg_scores)
+        elif m == 'Random Forest':
+            RFReg_model, RFReg_pred, RFReg_scores          =  RFReg(X_train, X_test, y_train, y_test)
+            y_pred_list.append(RFReg_pred)
+            scores_list.append(RFReg_scores)
+        elif m == 'K-Neighbors':
+            knn_model, knn_pred, knn_scores                =  knn(X_train, X_test, y_train, y_test)
+            y_pred_list.append(knn_pred)
+            scores_list.append(knn_scores)
+        elif m == 'Decision Tree':
+            DTree_model, DTree_pred, DTree_scores          =  DTree(X_train, X_test, y_train, y_test)
+            y_pred_list.append(DTree_pred)
+            scores_list.append(DTree_scores)
+        elif m == 'Support Vector Machine':
+            SVMreg_model, SVMreg_pred, SVMreg_scores       =  SVMreg(X_train, X_test, y_train, y_test)
+            y_pred_list.append(SVMreg_pred)
+            scores_list.append(SVMreg_scores)
+        elif m == 'Light GBM':
+            lgbmR_model, lgbmR_pred, lgbmR_scores          =  lgbmR(X_train, X_test, y_train, y_test)
+            y_pred_list.append(lgbmR_pred)
+            scores_list.append(lgbmR_scores)
+        elif m == 'Multi-layer Perceptron':
+            MLPreg_model, MLPreg_pred, MLPreg_scores       =  MLPreg(X_train, X_test, y_train, y_test)
+            y_pred_list.append(MLPreg_pred)
+            scores_list.append(MLPreg_scores)
+        elif m == 'Voting Ensemble':
+            voting_model, voting_pred, voting_scores       =  voting_ensemble(X_train, X_test, y_train, y_test)
+            y_pred_list.append(voting_pred)
+            scores_list.append(voting_scores)
+        elif m == 'Stacking Ensemble':
+            stacking_model, stacking_pred, stacking_scores =  stacking_ensemble(X_train, X_test, y_train, y_test)
+            y_pred_list.append(stacking_pred)
+            scores_list.append(stacking_scores)
+        else:
+            st.write('Please choose an algorithm from the list.')
+
     #Predictions
-    y_pred_list = [xgboost_pred, Linreg_pred, RFReg_pred, knn_pred, DTree_pred, SVMreg_pred, lgbmR_pred, MLPreg_pred,
-                   voting_pred, stacking_pred]
+    # y_pred_list = [xgboost_pred, Linreg_pred, RFReg_pred, knn_pred, DTree_pred, SVMreg_pred, lgbmR_pred, MLPreg_pred,
+    #               voting_pred, stacking_pred]
 
     y_pred = pd.concat(y_pred_list, axis=1)
     
@@ -484,8 +520,8 @@ def all_models(X_train, X_test, y_train, y_test):
     predictions.columns = ['date_loan','Test']
     
     #Scores
-    scores_list = [xgboost_scores, Linreg_scores, RFReg_scores, knn_scores, DTree_scores, SVMreg_scores, lgbmR_scores, MLPreg_scores,
-                   voting_scores, stacking_scores]
+    # scores_list = [xgboost_scores, Linreg_scores, RFReg_scores, knn_scores, DTree_scores, SVMreg_scores, lgbmR_scores, MLPreg_scores,
+    #               voting_scores, stacking_scores]
 
     df_scores = pd.concat(scores_list, axis=0).sort_values(by=['R2'], ascending=False)
     best_scores = pd.DataFrame(df_scores.iloc[0])
@@ -504,7 +540,8 @@ def all_models(X_train, X_test, y_train, y_test):
     # Source: https://otexts.com/fpp2/prediction-intervals.html
     
     return df_scores, best_scores, col, pred_data, test_data, y_lower, y_upper
-  
+
+
 # ==================================================================================================
 # Forecast
 # ==================================================================================================
@@ -517,99 +554,107 @@ def createFig(values):
     st.write(fig1)
 
 def forecast(data):
-    df = cleaning(data)
+    st.sidebar.subheader('Model Selection')
+    model_select = st.sidebar.multiselect(
+        'Select the algorithms you want to use',
+        ['XGBoost', 'Linear Regression', 'Random Forest', 'K-Neighbors', 'Decision Tree',
+        'Support Vector Machine', 'Light GBM', 'Multi-layer Perceptron', 'Voting Ensemble', 'Stacking Ensemble'])
 
-    df2 = df.resample('D').sum()
-    X_train, X_test, y_train, y_test = scale_data(df2, test_size=0.05)
+    if st.sidebar.button("Process Data"):
 
-    st.header('Predictions')
-    df_scores, best_scores, best_model, pred_data, test_data, y_lower, y_upper = all_models(X_train, X_test, y_train, y_test)
+        df = cleaning(data)
 
-    st.header('Model Performance Comparison')
-    st.write(df_scores)
-    createFig(df_scores[df_scores['R2'] > 0]['R2'])
+        df2 = df.resample('D').sum()
+        X_train, X_test, y_train, y_test = scale_data(df2, test_size=0.05)
 
-    st.header('Best Model Performance')
-    #st.subheader(best_model.iloc[0:0])
-    st.write(best_scores)
+        st.header('Predictions')
+        df_scores, best_scores, best_model, pred_data, test_data, y_lower, y_upper = all_models(model_select, X_train, X_test, y_train, y_test)
 
-    fig, ax = plt.subplots()
-    ax.plot(pred_data, color='blue', marker='o', label='Predicted')
-    ax.plot(test_data, color='orange', marker='o', label='Test')
-    ax.set_title('Time Series Forecast - Predicted vs Test')
-    #plt.rcParams["xtick.labelsize"] = 5
-    plt.rcParams["figure.figsize"] = (8, 4)
-    st.pyplot(fig)
+        st.header('Model Performance Comparison')
+        st.write(df_scores)
+        createFig(df_scores[df_scores['R2'] > 0]['R2'])
 
-    fig, ax = plt.subplots()
-    ax.plot(pred_data, color='blue', marker='o', label='Predicted')
-    ax.fill_between(pred_data.index, y_lower, y_upper, alpha=0.3)
-    ax.set_title('Time Series Forecast with Prediction Intervals')
-    #plt.rcParams["xtick.labelsize"] = 5
-    plt.rcParams["figure.figsize"] = (8, 4)
-    st.pyplot(fig)
+        st.header('Best Model Performance')
+        #st.subheader(best_model.iloc[0:0])
+        st.write(best_scores)
 
+        fig, ax = plt.subplots()
+        ax.plot(pred_data, color='blue', marker='o', label='Predicted')
+        ax.plot(test_data, color='orange', marker='o', label='Test')
+        ax.set_title('Time Series Forecast - Predicted vs Test')
+        #plt.rcParams["xtick.labelsize"] = 5
+        plt.rcParams["figure.figsize"] = (8, 4)
+        st.pyplot(fig)
 
-### Streamlit version of line graphs (1 chart for test, 1 chart for pred)
-    #st.line_chart(test_data)
-    #st.line_chart(pred_data)
-
-
-### For selecting timeframe of predictions
-#    st.sidebar.subheader("Select Timeframe")
-#    timeframe_select = st.sidebar.selectbox(
-#        label="Select Timeframe",
-#        options=['3 months', '6 months', '1 year', '2 years']
-#    )
-
-#    if timeframe_select == '3 months':
-#        time = 90
-#        tomorrow = data.index[-1:][0] + timedelta(days=1)
-#        future = data.index[-1:][0] + timedelta(days=time)
-    
-#    if timeframe_select == '6 months':
-#        time = 180
-#        tomorrow = data.index[-1:][0] + timedelta(days=1)
-#        future = data.index[-1:][0] + timedelta(days=time)
-    
-#    if timeframe_select == '1 year':
-#        time = 365
-#        tomorrow = data.index[-1:][0] + timedelta(days=1)
-#        future = data.index[-1:][0] + timedelta(days=time)
-    
-#    if timeframe_select == '2 years':
-#        time = 730
-#        tomorrow = data.index[-1:][0] + timedelta(days=1)
-#        future = data.index[-1:][0] + timedelta(days=time)
+        fig, ax = plt.subplots()
+        ax.plot(pred_data, color='blue', marker='o', label='Predicted')
+        ax.fill_between(pred_data.index, y_lower, y_upper, alpha=0.3)
+        ax.set_title('Time Series Forecast with Prediction Intervals')
+        #plt.rcParams["xtick.labelsize"] = 5
+        plt.rcParams["figure.figsize"] = (8, 4)
+        st.pyplot(fig)
 
 
-### For selecting confidence level
-#    st.sidebar.subheader("Select Confidence Level")
-#    confidence_level_select = st.sidebar.selectbox(
-#        label="Select Confidence Level",
-#        options=['90%', '95%', '99%']
-#    )
+    ### Streamlit version of line graphs (1 chart for test, 1 chart for pred)
+        #st.line_chart(test_data)
+        #st.line_chart(pred_data)
 
 
-### For computing prediction intervals using dynamic multiplier
-#    alpha = 0.05
-#    bootstrap = np.asarray([np.random.choice(res, size=res.shape) for _ in range(100)])
-#    q_bootstrap = np.quantile(bootstrap, q=[alpha/2, 1-alpha/2], axis=0)
+    ### For selecting timeframe of predictions
+    #    st.sidebar.subheader("Select Timeframe")
+    #    timeframe_select = st.sidebar.selectbox(
+    #        label="Select Timeframe",
+    #        options=['3 months', '6 months', '1 year', '2 years']
+    #    )
 
-#    if confidence_level_select == "90%":
-#        confidence_level = 1.645
+    #    if timeframe_select == '3 months':
+    #        time = 90
+    #        tomorrow = data.index[-1:][0] + timedelta(days=1)
+    #        future = data.index[-1:][0] + timedelta(days=time)
+        
+    #    if timeframe_select == '6 months':
+    #        time = 180
+    #        tomorrow = data.index[-1:][0] + timedelta(days=1)
+    #        future = data.index[-1:][0] + timedelta(days=time)
+        
+    #    if timeframe_select == '1 year':
+    #        time = 365
+    #        tomorrow = data.index[-1:][0] + timedelta(days=1)
+    #        future = data.index[-1:][0] + timedelta(days=time)
+        
+    #    if timeframe_select == '2 years':
+    #        time = 730
+    #        tomorrow = data.index[-1:][0] + timedelta(days=1)
+    #        future = data.index[-1:][0] + timedelta(days=time)
 
-#    if confidence_level_select == "95%":
-#        confidence_level = 1.96
 
-#    if confidence_level_select == "99%":
-#        confidence_level = 2.576
+    ### For selecting confidence level
+    #    st.sidebar.subheader("Select Confidence Level")
+    #    confidence_level_select = st.sidebar.selectbox(
+    #        label="Select Confidence Level",
+    #        options=['90%', '95%', '99%']
+    #    )
 
 
-### For outputting dfs of prediction, upper and lower values
-#    st.header("Prediction Values")
-#    st.dataframe(predictions)
-#    st.header("Predicted Upper Values")
-#    st.write(y_upper)
-#    st.header("Predicted Lower Values")
-#    st.write(y_lower)
+    ### For computing prediction intervals using dynamic multiplier
+    #    alpha = 0.05
+    #    bootstrap = np.asarray([np.random.choice(res, size=res.shape) for _ in range(100)])
+    #    q_bootstrap = np.quantile(bootstrap, q=[alpha/2, 1-alpha/2], axis=0)
+
+    #    if confidence_level_select == "90%":
+    #        confidence_level = 1.645
+
+    #    if confidence_level_select == "95%":
+    #        confidence_level = 1.96
+
+    #    if confidence_level_select == "99%":
+    #        confidence_level = 2.576
+
+
+    ### For outputting dfs of prediction, upper and lower values
+    #    st.header("Prediction Values")
+    #    st.dataframe(predictions)
+    #    st.header("Predicted Upper Values")
+    #    st.write(y_upper)
+    #    st.header("Predicted Lower Values")
+    #    st.write(y_lower)
