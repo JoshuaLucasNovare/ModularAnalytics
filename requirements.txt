@@ -1,8 +1,8 @@
-pandas==1.2.4
+pandas==1.4.3
 streamlit_pandas_profiling==0.1.2
-streamlit==0.82.0
-numpy==1.21.0
-scikit_learn==0.24.2
+streamlit==1.11.0
+numpy==1.23.0
+scikit_learn==1.1
 plotly_express==0.4.1
 plotly==5.1.0
 wordcloud==1.8.1
